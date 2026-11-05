@@ -1,0 +1,32 @@
+Go 5% used
+5%
+Go usage
+·
+Renews Nov 22
+·
+On pace for 12%
+Limits
+
+When your Go usage resets
+
+Rolling
+Resets in 2h 51m
+5% used
+Weekly
+Resets in 3d 15h
+5% used
+Monthly
+Resets in 16d 22h
+5% used
+Models
+
+Most used this period
+
+DeepSeek V4.1 Flash
+100%
+DeepSeek V4 Pro
+0%
+Requests
+3,252
+Tokens
+292.5M

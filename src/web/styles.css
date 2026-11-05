@@ -1,0 +1,85 @@
+:root {
+  --bg: #0f1115;
+  --card: #171a21;
+  --line: #262b36;
+  --text: #e6e8ee;
+  --muted: #8b93a7;
+  --warn: #e0a33e;
+  --danger: #e05a5a;
+  --accent: #7c8cff;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --line: #e3e6ec;
+    --text: #1a1d23;
+    --muted: #6b7385;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.55 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 16px 40px; }
+.top { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+.pill { font-size: 12px; color: var(--muted); border: 1px solid var(--line); padding: 1px 8px; border-radius: 999px; }
+.actions { margin-left: auto; display: flex; gap: 8px; }
+.btn {
+  margin-left: 0;
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.muted { color: var(--muted); font-size: 12px; }
+.notice { color: var(--warn); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.cards { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 1024px) {
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+}
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+.card.dim .summary { color: var(--muted); }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.name { font-weight: 600; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; white-space: nowrap; }
+.tag.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.tag.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.tag.muted { opacity: .75; }
+.summary { font-size: 24px; font-weight: 650; letter-spacing: -.4px; margin: 10px 0 4px; font-variant-numeric: tabular-nums; }
+.summary small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 6px; letter-spacing: 0; }
+.summary.empty { font-size: 15px; font-weight: 500; color: var(--muted); }
+.windows { display: grid; gap: 8px; margin-top: 10px; }
+.win { border-top: 1px solid var(--line); padding-top: 8px; min-width: 0; }
+.win.empty { color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
+.win.dim .wvalue { color: var(--muted); text-decoration: line-through solid color-mix(in srgb, var(--muted) 40%, transparent); }
+.whead { display: flex; justify-content: space-between; gap: 10px; font-variant-numeric: tabular-nums; }
+.wlabel { color: var(--muted); }
+.wvalue { font-weight: 550; text-align: right; }
+.wmeta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 3px; font-size: 12px; }
+.err { margin-top: 10px; color: var(--warn); font-size: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.hint { color: var(--muted); margin-top: 3px; }
+.win, .wvalue, .wmeta, .hint, .foot { overflow-wrap: anywhere; }
+.hint code, .foot code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: color-mix(in srgb, var(--text) 8%, transparent); padding: 1px 5px; border-radius: 4px; }
+.foot { margin-top: 18px; color: var(--muted); font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+a { color: inherit; }
+@media (max-width: 480px) {
+  .wrap { padding: 18px 10px 32px; }
+  .actions { width: 100%; }
+  .btn { flex: 1; }
+}
+@media (max-width: 1023px) {
+  .summary { font-size: 22px; }
+}

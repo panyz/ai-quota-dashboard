@@ -1,0 +1,13 @@
+{
+  "name": "ai-quota-dashboard",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Local CLI + dashboard for AI subscription quotas, reading already-signed-in console pages through CDP.",
+  "license": "MIT",
+  "bin": { "quota": "./bin/quota.js" },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test test/unit/*.test.js",
+    "quota": "node bin/quota.js"
+  }
+}
