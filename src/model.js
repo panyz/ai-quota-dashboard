@@ -17,7 +17,7 @@ export const SOURCES = Object.freeze({
     adapter: "volc-v1",
     workspace: null,
     defaultWindow: "auto",
-    url: "https://console.volcengine.com/ark/region:cn-beijing/openManagement?advancedActiveKey=subscribe",
+    url: "https://console.volcengine.com/ark/region:cn-beijing/subscription/coding-plan",
   },
   opencode_go: {
     key: "opencode_go",

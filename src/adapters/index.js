@@ -6,7 +6,8 @@ import { cdpVersion, createTarget, closeTarget, evaluate, listTargets, waitFor, 
 const READY = {
   opencode_go: () =>
     `document.body.innerText.includes('5-hour window') || document.body.innerText.includes('Rolling') || /SIGN IN|OPEN CONSOLE|Go is a subscription/.test(document.body.innerText)`,
-  volcengine: () => `document.body.innerText.includes('开通管理')`,
+  volcengine: () =>
+    `document.body.innerText.includes('套餐用量限额') || document.body.innerText.includes('我的订阅') || document.body.innerText.includes('开通管理')`,
 };
 
 const PARSERS = { opencode_go: parseOpenCode, volcengine: parseVolcengine };
@@ -34,7 +35,7 @@ export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}
     if (!tab) {
       tab = await createTarget(url, { background: true });
       created = true;
-    } else if (!tab.url.startsWith(url.split("?")[0])) {
+    } else if (!isVolcPlanPage(id, tab.url) && !tab.url.startsWith(url.split("?")[0])) {
       await evaluate(tab.id, `location.href=${JSON.stringify(url)}`, { awaitPromise: false }).catch(() => {});
     }
 
@@ -52,6 +53,12 @@ export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}
   } finally {
     if (created && !keepTab && tab?.id) await closeTarget(tab.id).catch(() => {});
   }
+}
+
+/** The volcengine console has two quota entry points; both are acceptable. */
+function isVolcPlanPage(id, url) {
+  if (id !== "volcengine") return false;
+  return url.includes("/subscription/coding-plan") || url.includes("/openManagement");
 }
 
 /** /console redirects into a workspace; /console/<workspace>/go carries the explicit windows. */
