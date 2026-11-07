@@ -59,7 +59,7 @@ test("list --json empty state: schemaVersion=current, three null windows, meta d
   assert.deepEqual(Object.keys(d.sources).sort(), ["opencode_go", "volcengine", "x_premium"]);
   assert.deepEqual(Object.keys(d.sources.volcengine.windows), ["h5", "week", "month"]);
   assert.equal(d.sources.volcengine.status, "never");
-  assert.equal(d.sources.x_premium.status, "manual");
+  assert.equal(d.sources.x_premium.status, "never");
   assert.equal(d.sources.volcengine.defaultWindow, "auto");
   assert.equal(d.sources.opencode_go.defaultWindow, "h5");
   assert.ok(!JSON.stringify(d).match(/NaN|undefined/));
@@ -85,7 +85,7 @@ test("sources --json lists built-in sources; --set-default writes meta", () => {
   assert.equal(run(["sources", "--set-default", "volcengine=2h"], { QUOTA_DATA_DIR: dir }).code, 2);
 });
 
-test("set writes one window; others survive; status manual", () => {
+test("set writes one window; others survive; status ok", () => {
   const dir = tmp();
   assert.equal(run(["set", "x-premium", "--window", "h5", "--remaining", "7", "--total", "10", "--unit", "次"], { QUOTA_DATA_DIR: dir }).code, 0);
   run(["set", "x-premium", "--window", "week", "--remaining", "3", "--unit", "次"], { QUOTA_DATA_DIR: dir });
@@ -94,7 +94,7 @@ test("set writes one window; others survive; status manual", () => {
   assert.equal(s.windows.h5.remaining, 7);
   assert.equal(s.windows.week.remaining, 3);
   assert.equal(s.windows.month.remaining, 1);
-  assert.equal(s.status, "manual");
+  assert.equal(s.status, "ok");
 });
 
 test("set rejects bad input with exit 2 and leaves data untouched", () => {
@@ -134,7 +134,7 @@ test("fetch mock matrix maps to the agreed exit codes", () => {
   for (const [mode, want] of cases) {
     const r = run(["fetch", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: mode });
     assert.equal(r.code, want, `${mode} => ${r.code} ${r.stderr}`);
-    assert.equal(json(r.stdout).summary.requested, 2);
+    assert.equal(json(r.stdout).summary.requested, 3);
   }
 });
 
@@ -296,10 +296,12 @@ test("unknown flag / command / --version", () => {
   assert.equal(v.stdout.trim(), "2");
 });
 
-test("fetch --source rejects the manual source before any CDP call", () => {
-  const r = run(["fetch", "--source", "x-premium"], { QUOTA_DATA_DIR: tmp() });
-  assert.equal(r.code, 2);
-  assert.match(r.stderr, /手动源/);
+test("fetch --source x-premium is an auto source", () => {
+  const dir = tmp();
+  const r = run(["fetch", "--source", "x-premium", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "ok" });
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(json(r.stdout).sources.x_premium.windows.week.remaining, 31);
+  assert.equal(json(r.stdout).sources.x_premium.status, "ok");
 });
 
 test("data dir not writable => exit 8 with a path message, not 'locked'", () => {

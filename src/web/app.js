@@ -85,10 +85,15 @@ function badgeOf(w) {
   if (typeof w.total === "number" && w.total > 0 && w.remaining / w.total <= 0.2) return "偏低";
   return null;
 }
+function windowKeys(source) {
+  return Array.isArray(source.reportedWindows) && source.reportedWindows.length ? source.reportedWindows : WINDOW_KEYS;
+}
 function defaultKey(source) {
+  const keys = windowKeys(source);
   const dw = source.defaultWindow;
-  if (dw && dw !== "auto") return dw;
-  return source.mainWindow || null;
+  if (dw && dw !== "auto" && keys.includes(dw)) return dw;
+  if (source.mainWindow && keys.includes(source.mainWindow)) return source.mainWindow;
+  return keys[0] ?? null;
 }
 
 function row(key, w, isDefault, partial) {
@@ -121,15 +126,10 @@ function card(id, s) {
   else summary = `剩余 ${fmtAmount(w.remaining, w.unit)}`;
 
   const statusTag = s.status && s.status !== "ok" && s.status !== "manual" ? `<span class="tag warn">${esc(SOURCE_STATUS[s.status] ?? s.status)}</span>` : "";
-  const rows = WINDOW_KEYS.map((k) => row(k, s.windows[k], k === eff, s.status === "partial")).join("");
+  const rows = windowKeys(s).map((k) => row(k, s.windows[k], k === eff, s.status === "partial")).join("");
   const err = s.error?.message
     ? `<div class="err">${esc(s.error.message)}<div class="hint">${esc(HINTS[s.error.code] ?? "")}</div></div>`
     : "";
-  const manualHint =
-    id === "x_premium"
-      ? `<div class="hint">手动更新：<code>quota set x-premium --window 5h --remaining 7 --total 10 --unit 次</code></div>`
-      : "";
-
   return `<article class="card${w ? "" : " dim"}">
     <div class="card-head">
       <span class="name">${esc(s.name ?? id)}</span>
@@ -137,7 +137,7 @@ function card(id, s) {
     </div>
     <div class="summary${w ? "" : " empty"}">${esc(summary)}<small>${eff ? esc(WINDOW_LABEL[eff] ?? eff) : ""}</small></div>
     <div class="windows">${rows}</div>
-    ${err}${manualHint}
+    ${err}
   </article>`;
 }
 
@@ -195,5 +195,5 @@ if (!token) {
       refreshState.textContent = `读取失败：${err.message}`;
     }
   });
-  load();
+  refresh();
 }

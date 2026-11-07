@@ -51,7 +51,10 @@ test("API requires the token; state matches show --json shape", async () => {
     assert.deepEqual(Object.keys(d.sources).sort(), ["opencode_go", "volcengine", "x_premium"]);
     assert.deepEqual(Object.keys(d.sources.volcengine.windows), ["h5", "week", "month"]);
     assert.equal(d.sources.volcengine.mode, "auto");
-    assert.equal(d.sources.x_premium.status, "manual");
+    assert.equal(d.sources.x_premium.status, "never");
+    assert.equal(d.sources.x_premium.mode, "auto");
+    assert.deepEqual(d.sources.x_premium.reportedWindows, ["week"]);
+    assert.deepEqual(d.sources.volcengine.reportedWindows, ["h5", "week", "month"]);
   });
 });
 
@@ -64,7 +67,7 @@ test("POST /api/refresh refreshes and persists; second concurrent call gets 409"
     const first = await p1;
     assert.equal(first.status, 200);
     const d = await first.json();
-    assert.equal(d.summary.requested, 2);
+    assert.equal(d.summary.requested, 3);
     assert.equal(d.ok, false);
   });
 });
@@ -79,8 +82,10 @@ test("page has a refresh button, a data path, and no timer", async () => {
     assert.match(html, /data-datapath="[^"]*state\.json"/);
     const js = await (await fetch(`${base}/app.js`)).text();
     assert.doesNotMatch(js, /setInterval|setTimeout\(\s*load/);
-    assert.match(js, /quota set x-premium/);
+    assert.doesNotMatch(js, /quota set x-premium/);
     assert.match(js, /id="reload"|reloadBtn/);
+    assert.match(js, /reportedWindows/);
+    assert.match(js, /refresh\(\);/);
   });
 });
 

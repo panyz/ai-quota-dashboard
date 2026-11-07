@@ -46,11 +46,11 @@ npm link        # 之后可直接用 quota
 ## 命令
 
 ```bash
-quota fetch [--source volcengine|opencode-go|all] [--timeout 秒] [--json]
+quota fetch [--source volcengine|opencode-go|x-premium|all] [--timeout 秒] [--json]
 quota list [source] [--json]
-quota set x-premium --window h5 --remaining 7 --total 10 --unit 次 [--reset-at ISO] [--json]
+quota set x-premium --window week --remaining 31 --total 100 --unit % [--reset-at ISO] [--json]
 quota sources [--json] [--set-default volcengine=week]
-quota probe --source volcengine|opencode-go [--json] [--out FILE]
+quota probe --source volcengine|opencode-go|x-premium [--json] [--out FILE]
 quota clear --yes            # 别名 reset
 quota doctor [--json]
 quota serve [--port 8787]
@@ -59,10 +59,10 @@ quota --version
 
 - `fetch` 逐源读取；只合并本次读到的窗口，没读到的保留旧值并在 `error.missingWindows` 标出。
 - `--timeout` 是整条命令的总预算，不是每源各算。
-- `set` 只允许 `x-premium`，窗口固定 `h5|week|month`，一次只写一个窗口。
+- `set` 只允许 `x-premium`（解析失败时的手动覆盖），窗口固定 `h5|week|month`，一次只写一个窗口。
 - `sources --set-default` 写入 `state.meta.defaultWindow`，不生成配置文件。
 - `probe` 只读诊断：不写 `state.json`、不触发抓取。
-- `serve` 生成一次性 token，只绑 `127.0.0.1`；页面有「刷新额度」（POST）与「重新读取」（仅 GET）。
+- `serve` 生成一次性 token，只绑 `127.0.0.1`；打开页面会自动「刷新额度」（POST），「重新读取」仅 GET。Grok 卡片只显示周窗口。
 
 ## 数据与隐私
 
@@ -112,7 +112,7 @@ mock 只在显式设置环境变量时生效。`AQD_TEST_MOCK` 是兼容别名�
 ## 已知限制
 
 - 依赖控制台页面结构，平台改版会导致解析失败；需要按提示更新解析器。
-- X 的 Grok 额度没有公开接口，只能手动录入。
+- X / Grok 没有公开额度接口。自动读取 `grok.com/dashboard` 上暴露的周用量百分比（`N% used`），换算成剩余 `100-N`%；没有 5 小时 / 月窗口。页面改版后用 `quota probe --source x-premium`。
 - 不处理登录、验证码、2FA；不做后台定时抓取。
 - 只支持单账户；多账户不在当前范围。
 
