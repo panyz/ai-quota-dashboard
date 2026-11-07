@@ -1,4 +1,4 @@
-import { SOURCE_IDS, WINDOW_KEYS, SCHEMA_VERSION, deriveWindowStatus, wasNotReadThisAttempt } from "./model.js";
+import { SOURCE_IDS, WINDOW_KEYS, SCHEMA_VERSION, advertisedWindows, deriveWindowStatus, wasNotReadThisAttempt } from "./model.js";
 
 /**
  * Output shape for one source (AC-10). Windows are always the fixed three keys.
@@ -28,6 +28,7 @@ export function buildSourceView(id, source, state, now) {
     status: source.status,
     defaultWindow: state?.meta?.defaultWindow?.[id] ?? "auto",
     mainWindow: source.mainWindow,
+    reportedWindows: [...advertisedWindows(id)],
     error: source.error,
     lastAttemptAt: source.lastAttemptAt,
     adapterVersion: source.adapterVersion,

@@ -1,4 +1,4 @@
-import { SOURCE_IDS, WINDOW_KEYS, resolveSource } from "./model.js";
+import { SOURCE_IDS, WINDOW_KEYS, SOURCES, advertisedWindows, resolveSource } from "./model.js";
 import { readSource } from "./adapters/index.js";
 import { mockMode, mockRead } from "./mock.js";
 import { updateState, readState } from "./store.js";
@@ -24,7 +24,7 @@ const CODE_EXIT = {
 };
 
 export function autoSourceIds() {
-  return SOURCE_IDS.filter((id) => id !== "x_premium");
+  return SOURCE_IDS.filter((id) => SOURCES[id].mode === "auto");
 }
 
 export function normalizeIds(ids) {
@@ -40,7 +40,7 @@ export function normalizeIds(ids) {
  * Failure keeps old windows; success merges only the windows that were read.
  */
 export async function performFetch({ ids, timeoutSec = 30, keepTab = false, now = new Date() }) {
-  const requested = [...new Set(ids)].filter((id) => id !== "x_premium");
+  const requested = [...new Set(ids)].filter((id) => SOURCES[id]?.mode === "auto");
   const startedAt = now;
   const deadline = Date.now() + Math.max(1, Number(timeoutSec) || 30) * 1000;
   const mode = mockMode();
@@ -70,7 +70,7 @@ export async function performFetch({ ids, timeoutSec = 30, keepTab = false, now 
         source.error = { code: read.code, message: String(read.message ?? "").slice(0, 160) };
         continue;
       }
-      const missing = WINDOW_KEYS.filter((key) => !read.windows?.[key]);
+      const missing = advertisedWindows(id).filter((key) => !read.windows?.[key]);
       for (const key of WINDOW_KEYS) {
         const w = read.windows?.[key];
         if (!w) continue; // keep previous value for windows not read this time

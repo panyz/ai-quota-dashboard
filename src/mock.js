@@ -26,6 +26,10 @@ const OK_WINDOWS = {
     windows: { h5: windowValue(90, 100, "%"), week: windowValue(80, 100, "%"), month: windowValue(70, 100, "%") },
     mainWindow: "h5",
   },
+  x_premium: {
+    windows: { week: windowValue(31, 100, "%") },
+    mainWindow: "week",
+  },
 };
 
 export function mockMode() {

@@ -33,13 +33,19 @@ export const SOURCES = Object.freeze({
     key: "x_premium",
     id: "x-premium",
     name: "X Premium · Grok",
-    mode: "manual",
-    adapter: null,
+    mode: "auto",
+    adapter: "grok-v1",
     workspace: null,
-    defaultWindow: "h5",
-    url: null,
+    defaultWindow: "week",
+    url: "https://grok.com/dashboard/usage",
+    reportedWindows: ["week"],
   },
 });
+
+/** Windows this source is expected to fill; others stay null without marking partial. */
+export function advertisedWindows(id) {
+  return SOURCES[id]?.reportedWindows ?? WINDOW_KEYS;
+}
 
 const ALIASES = Object.freeze({
   volcengine: "volcengine",

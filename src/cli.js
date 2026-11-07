@@ -6,6 +6,7 @@ import {
   SOURCE_IDS,
   SOURCES,
   WINDOW_KEYS,
+  advertisedWindows,
   resolveSource,
   deriveWindowStatus,
 } from "./model.js";
@@ -30,15 +31,15 @@ import {
 const USAGE = `quota — 本地 AI 额度聚合 CLI（schema ${SCHEMA_VERSION}）
 
 用法:
-  quota fetch [--source volcengine|opencode-go|all] [--timeout 秒] [--json]
+  quota fetch [--source volcengine|opencode-go|x-premium|all] [--timeout 秒] [--json]
                                           读取自动源（--timeout 是整条命令的总预算）
   quota list [source] [--json]            查看全部或单个源
   quota set x-premium --window h5|week|month --remaining N
         [--total N] [--unit %] [--reset-at ISO] [--json]
-                                          手动写入（仅 X）
+                                          手动覆盖（解析失败时）
   quota sources [--json] [--set-default volcengine=week]
                                           内置源；写 state.meta.defaultWindow
-  quota probe --source volcengine|opencode-go [--json] [--out FILE]
+  quota probe --source volcengine|opencode-go|x-premium [--json] [--out FILE]
                                           只读诊断，不改数据
   quota clear --yes                       清空额度数据（别名 reset）
   quota doctor [--json]                   自检 dataDir/cdp/serverPort/schema
@@ -118,7 +119,7 @@ function printSource(id, source, state) {
   const explicit = state.meta.defaultWindow[id];
   const effective = explicit === "auto" ? source.mainWindow : explicit;
   const lines = [`${SOURCES[id].name}  [${sourceStatusText(source.status)}]  (${SOURCES[id].id})`];
-  for (const key of WINDOW_KEYS) lines.push(windowLine(key, source.windows[key], source, effective, current));
+  for (const key of advertisedWindows(id)) lines.push(windowLine(key, source.windows[key], source, effective, current));
   if (source.error?.message) lines.push(`  错误：${source.error.message}`);
   console.log(lines.join("\n"));
 }
@@ -208,8 +209,7 @@ async function cmdFetch(argv) {
   if (!rawSource || rawSource === "all") ids = autoSourceIds();
   else {
     const id = resolveSource(rawSource);
-    if (!id) throw new UsageError(`未知源：${rawSource}（可选 volcengine | opencode-go | all）`);
-    if (id === "x_premium") throw new UsageError("x-premium 是手动源，不支持 fetch；请用 quota set");
+    if (!id) throw new UsageError(`未知源：${rawSource}（可选 volcengine | opencode-go | x-premium | all）`);
     ids = [id];
   }
 
@@ -226,7 +226,7 @@ async function cmdFetch(argv) {
       if (!ids.includes(id)) continue;
       const src = result.sources[id];
       console.log(`${SOURCES[id].name}  [${sourceStatusText(src.status)}]`);
-      for (const key of WINDOW_KEYS) {
+      for (const key of advertisedWindows(id)) {
         const w = src.windows[key];
         console.log(w ? `  ${windowLabel(key)}：剩余 ${fmtRemaining(w)}` : `  ${windowLabel(key)}：未提供`);
       }
@@ -286,7 +286,7 @@ async function cmdSet(argv) {
   await updateState((state) => {
     const source = state.sources.x_premium;
     source.windows[window] = { remaining, total: total ?? null, unit, resetAt, updatedAt, window };
-    source.status = "manual";
+    source.status = "ok";
     source.error = null;
   });
 
@@ -347,8 +347,7 @@ async function cmdProbe(argv) {
   const args = parseArgs(argv, { source: "string", json: "bool", out: "string", "keep-tab": "bool" });
   const raw = args[FLAGS].source ?? args._[0];
   const id = resolveSource(raw);
-  if (!id) throw new UsageError("请用 --source 指定源：volcengine | opencode-go");
-  if (id === "x_premium") throw new UsageError("x-premium 没有自动适配器");
+  if (!id) throw new UsageError("请用 --source 指定源：volcengine | opencode-go | x-premium");
   const json = Boolean(args[FLAGS].json);
 
   let report;

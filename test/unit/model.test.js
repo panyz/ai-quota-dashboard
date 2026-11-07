@@ -22,9 +22,9 @@ test("empty state: three fixed windows per source + meta.defaultWindow", () => {
     assert.deepEqual(Object.keys(s.sources[id].windows), WINDOW_KEYS);
     for (const k of WINDOW_KEYS) assert.equal(s.sources[id].windows[k], null);
   }
-  assert.equal(s.sources.x_premium.status, "manual");
+  assert.equal(s.sources.x_premium.status, "never");
   assert.equal(s.sources.volcengine.status, "never");
-  assert.deepEqual(s.meta.defaultWindow, { volcengine: "auto", opencode_go: "h5", x_premium: "h5" });
+  assert.deepEqual(s.meta.defaultWindow, { volcengine: "auto", opencode_go: "h5", x_premium: "week" });
   assert.equal(s.meta.lastFetchAt, null);
 });
 
@@ -60,13 +60,13 @@ test("a window without updatedAt cannot be displayed as current", () => {
   assert.equal(state.sources.x_premium.windows.h5, null);
 });
 
-test("manual source keeps status=manual even with values", () => {
+test("auto source keeps a stored ok status", () => {
   const doc = emptyState();
-  doc.sources.x_premium.status = "fresh";
-  doc.sources.x_premium.windows.h5 = w();
+  doc.sources.x_premium.status = "ok";
+  doc.sources.x_premium.windows.week = w();
   const { state } = normalizeState(clone(doc));
-  assert.equal(state.sources.x_premium.status, "manual");
-  assert.equal(state.sources.x_premium.mode, "manual");
+  assert.equal(state.sources.x_premium.status, "ok");
+  assert.equal(state.sources.x_premium.mode, "auto");
 });
 
 test("effective default window comes from meta.defaultWindow", () => {

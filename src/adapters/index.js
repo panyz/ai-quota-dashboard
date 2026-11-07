@@ -1,6 +1,7 @@
 import { SOURCES } from "../model.js";
 import { parseOpenCode } from "../parsers/opencode.js";
 import { parseVolcengine } from "../parsers/volcengine.js";
+import { parseGrok } from "../parsers/grok.js";
 import { cdpVersion, createTarget, closeTarget, evaluate, listTargets, waitFor, sleep } from "../cdp.js";
 
 const READY = {
@@ -8,9 +9,11 @@ const READY = {
     `document.body.innerText.includes('5-hour window') || document.body.innerText.includes('Rolling') || /SIGN IN|OPEN CONSOLE|Go is a subscription/.test(document.body.innerText)`,
   volcengine: () =>
     `document.body.innerText.includes('套餐用量限额') || document.body.innerText.includes('我的订阅') || document.body.innerText.includes('开通管理')`,
+  x_premium: () =>
+    `document.body.innerText.includes('Weekly included usage') || document.body.innerText.includes('Weekly SuperGrok Limit') || /Sign in|Log in|Continue with/.test(document.body.innerText)`,
 };
 
-const PARSERS = { opencode_go: parseOpenCode, volcengine: parseVolcengine };
+const PARSERS = { opencode_go: parseOpenCode, volcengine: parseVolcengine, x_premium: parseGrok };
 
 /**
  * Read one auto source through the already-signed-in console tab.
@@ -35,13 +38,14 @@ export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}
     if (!tab) {
       tab = await createTarget(url, { background: true });
       created = true;
-    } else if (!isVolcPlanPage(id, tab.url) && !tab.url.startsWith(url.split("?")[0])) {
+    } else if (!isReuseableTab(id, tab.url) && !tab.url.startsWith(url.split("?")[0])) {
       await evaluate(tab.id, `location.href=${JSON.stringify(url)}`, { awaitPromise: false }).catch(() => {});
     }
 
     await waitFor(tab.id, "document.readyState === 'complete'", { timeoutMs: 15000, intervalMs: 300 });
     await waitFor(tab.id, READY[id](), { timeoutMs: Math.min(20000, timeoutMs), intervalMs: 500 }).catch(() => {});
     if (id === "opencode_go") await preferWorkspaceGoPage(tab.id);
+    if (id === "x_premium") await preferGrokUsagePage(tab.id);
     await sleep(600);
 
     const text = await evaluate(tab.id, "document.body.innerText || ''");
@@ -59,6 +63,24 @@ export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}
 function isVolcPlanPage(id, url) {
   if (id !== "volcengine") return false;
   return url.includes("/subscription/coding-plan") || url.includes("/openManagement");
+}
+
+function isGrokDash(id, url) {
+  return id === "x_premium" && /^https:\/\/grok\.com\/dashboard(\/|\?|$)/.test(url);
+}
+
+function isReuseableTab(id, url) {
+  return isVolcPlanPage(id, url) || isGrokDash(id, url);
+}
+
+/** Overview already shows weekly %; only hop to /usage when that copy is missing. */
+async function preferGrokUsagePage(tabId) {
+  const text = await evaluate(tabId, "document.body.innerText || ''");
+  if (/Weekly included usage|Weekly SuperGrok Limit/i.test(text)) return;
+  const url = SOURCES.x_premium.url;
+  await evaluate(tabId, `location.href=${JSON.stringify(url)}`, { awaitPromise: false }).catch(() => {});
+  await waitFor(tabId, "document.readyState === 'complete'", { timeoutMs: 15000 }).catch(() => {});
+  await waitFor(tabId, READY.x_premium(), { timeoutMs: 15000 }).catch(() => {});
 }
 
 /** /console redirects into a workspace; /console/<workspace>/go carries the explicit windows. */
@@ -98,6 +120,7 @@ export async function probeSource(id, { keepTab = false, timeoutMs = 20000 } = {
     await waitFor(tab.id, "document.readyState === 'complete'", { timeoutMs: 15000 }).catch(() => {});
     await waitFor(tab.id, READY[id](), { timeoutMs, intervalMs: 500 }).catch(() => {});
     if (id === "opencode_go") await preferWorkspaceGoPage(tab.id);
+    if (id === "x_premium") await preferGrokUsagePage(tab.id);
     await sleep(800);
     const finalUrl = await evaluate(tab.id, "location.href");
     const text = await evaluate(tab.id, "document.body.innerText || ''");
