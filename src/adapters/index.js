@@ -16,6 +16,37 @@ const READY = {
 const PARSERS = { opencode_go: parseOpenCode, volcengine: parseVolcengine, x_premium: parseGrok };
 
 /**
+ * Chrome's own error page is not the product's HTML: classifying it as a parse
+ * failure sends the reader chasing a parser bug that does not exist.
+ */
+const CHROME_ERROR_URL = /^(chrome-error:|chrome:\/\/)/;
+const NET_ERROR = /\b(ERR_[A-Z_]+)\b/;
+
+/**
+ * Describe a tab that never reached the site.
+ * @param {string} finalUrl
+ * @param {string} text
+ * @returns {{code:string,message:string}|null} null when the page is real content
+ */
+export function classifyUnreachable(finalUrl, text) {
+  const url = String(finalUrl ?? "");
+  const body = String(text ?? "");
+  const netCode = (body.match(NET_ERROR) ?? [])[1] ?? null;
+  if (!CHROME_ERROR_URL.test(url) && netCode === null) return null;
+  const host = (() => {
+    try {
+      return new URL(url).host || "该页面";
+    } catch {
+      return "该页面";
+    }
+  })();
+  return {
+    code: "page_unreachable",
+    message: `浏览器打不开 ${host}${netCode ? `（${netCode}）` : ""}：网络或代理异常，确认该站点能在同一浏览器里手动打开`,
+  };
+}
+
+/**
  * Read one auto source through the already-signed-in console tab.
  * Resolves { ok:true, windows, mainWindow, adapterVersion } | { ok:false, code, message }.
  * Never writes storage, never touches cookies/tokens, never clicks.
@@ -49,6 +80,9 @@ export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}
     await sleep(600);
 
     const text = await evaluate(tab.id, "document.body.innerText || ''");
+    const finalUrl = await evaluate(tab.id, "location.href").catch(() => "");
+    const unreachable = classifyUnreachable(finalUrl, text);
+    if (unreachable) return { ok: false, ...unreachable };
     return PARSERS[id](text, new Date());
   } catch (err) {
     const message = String(err?.message ?? err);
@@ -124,7 +158,8 @@ export async function probeSource(id, { keepTab = false, timeoutMs = 20000 } = {
     await sleep(800);
     const finalUrl = await evaluate(tab.id, "location.href");
     const text = await evaluate(tab.id, "document.body.innerText || ''");
-    const parsed = PARSERS[id](text, new Date());
+    const unreachable = classifyUnreachable(finalUrl, text);
+    const parsed = unreachable ? { ok: false, ...unreachable } : PARSERS[id](text, new Date());
     return {
       source: SOURCES[id].id,
       url,

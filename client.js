@@ -2,8 +2,10 @@
  * Client half of the AI quota dashboard plugin.
  *
  * Renders a compact strip in the composer dock: one chip per quota source plus
- * a refresh action. Clicking the strip expands an in-flow panel with every
- * window (5h / week / month), its remaining amount and reset countdown.
+ * a refresh action. Clicking the strip opens a dialog, rendered in the
+ * frame-wide `shell.overlay` slot (the docked composer clips its own subtree),
+ * listing every window (5h / week / month) with its remaining amount and reset
+ * countdown.
  *
  * Data comes from the plugin's own same-origin routes registered by index.js.
  */
@@ -28,15 +30,16 @@ window.__ModuleLoader__.load({
       'manual',
       'not_logged_in',
       'parse_failed',
+      'page_unreachable',
       'timeout',
       'cdp_unavailable',
     ];
 
     const ZH = {
       'dock.label': 'AI 额度',
-      'dock.expand': '展开额度详情',
-      'dock.collapse': '收起额度详情',
+      'dock.expand': '查看额度详情',
       'dock.details': '剩余额度',
+      'dialog.close': '关闭',
       'dock.refresh': '刷新',
       'dock.refreshing': '刷新中',
       'dock.loading': '读取中…',
@@ -58,6 +61,7 @@ window.__ModuleLoader__.load({
       'status.manual': '手动',
       'status.not_logged_in': '未登录',
       'status.parse_failed': '解析失败',
+      'status.page_unreachable': '页面打不开',
       'status.timeout': '超时',
       'status.cdp_unavailable': '浏览器未连接',
       'status.unknown': '状态未知',
@@ -82,8 +86,8 @@ window.__ModuleLoader__.load({
     const EN = {
       'dock.label': 'AI quota',
       'dock.expand': 'Show quota details',
-      'dock.collapse': 'Hide quota details',
       'dock.details': 'Remaining quota',
+      'dialog.close': 'Close',
       'dock.refresh': 'Refresh',
       'dock.refreshing': 'Refreshing',
       'dock.loading': 'Loading…',
@@ -105,6 +109,7 @@ window.__ModuleLoader__.load({
       'status.manual': 'Manual',
       'status.not_logged_in': 'Signed out',
       'status.parse_failed': 'Parse failed',
+      'status.page_unreachable': 'Page unavailable',
       'status.timeout': 'Timed out',
       'status.cdp_unavailable': 'Browser unavailable',
       'status.unknown': 'Unknown',
@@ -202,30 +207,44 @@ window.__ModuleLoader__.load({
 .aqd-spin { animation: aqd-spin 1s linear infinite; }
 @keyframes aqd-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .aqd-spin { animation-duration: 2.4s; } }
-.aqd-panel {
+.aqd-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 32%, transparent);
+  animation: aqd-fade 120ms ease-out;
+}
+@keyframes aqd-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .aqd-overlay { animation: none; } }
+.aqd-dialog {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  width: min(380px, calc(100vw - 48px));
-  max-height: 340px;
-  overflow-y: auto;
-  padding: 8px;
+  width: min(460px, 100%);
+  max-height: min(70vh, 560px);
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-1);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-overlay);
+  box-shadow: var(--dsw-elevation-panel);
   color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 18px;
 }
-.aqd-panel-head {
+.aqd-dialog-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 4px 6px;
+  gap: 12px;
+  padding: 12px 12px 10px 16px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
-.aqd-panel-title { font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-primary); }
-.aqd-panel-meta {
+.aqd-dialog-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.aqd-dialog-title { font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+.aqd-dialog-meta {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -233,6 +252,28 @@ window.__ModuleLoader__.load({
   font-size: 11px;
   color: var(--dsw-alias-label-secondary);
   font-variant-numeric: tabular-nums;
+}
+.aqd-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+.aqd-close:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
+.aqd-close:focus-visible { outline: 1px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
+.aqd-dialog-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 12px 6px;
 }
 .aqd-src { display: flex; flex-direction: column; gap: 6px; padding: 8px 4px; }
 .aqd-src + .aqd-src { border-top: 1px solid var(--dsw-alias-border-l1); }
@@ -277,12 +318,12 @@ window.__ModuleLoader__.load({
   font-size: 11px;
   color: var(--dsw-alias-state-error-primary);
 }
-.aqd-panel-foot {
+.aqd-dialog-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 4px 0;
+  padding: 10px 16px 12px;
   border-top: 1px solid var(--dsw-alias-border-l1);
   font-size: 11px;
   color: var(--dsw-alias-label-secondary);
@@ -348,7 +389,16 @@ window.__ModuleLoader__.load({
       refreshing: false,
       error: null,
       lastResult: null,
+      open: false,
     });
+
+    function openDialog() {
+      store.set((current) => ({ ...current, open: true }));
+    }
+
+    function closeDialog() {
+      store.set((current) => ({ ...current, open: false }));
+    }
 
     function messageOf(error) {
       if (!error) return 'unknown error';
@@ -689,7 +739,6 @@ window.__ModuleLoader__.load({
     }
 
     function QuotaDock() {
-      const [expanded, setExpanded] = React.useState(false);
       const [, setTick] = React.useState(0);
       const state = store.get();
       const view = state.view;
@@ -715,6 +764,10 @@ window.__ModuleLoader__.load({
           cancelled = true;
         };
       }, []);
+
+      // The dock disappears whenever the composer leaves the typing state; the
+      // dialog lives in the frame overlay, so close it before it orphans.
+      React.useEffect(() => () => store.set((current) => ({ ...current, open: false })), []);
 
       React.useEffect(() => {
         if (!state.refreshing) return undefined;
@@ -761,82 +814,158 @@ window.__ModuleLoader__.load({
         startRefresh();
       };
 
-      const strip = h(
-        'div',
-        { className: 'aqd-strip' },
-        h(
-          'button',
-          {
-            type: 'button',
-            className: 'aqd-toggle',
-            onClick: () => setExpanded((value) => !value),
-            title: expanded ? tr('dock.collapse') : tr('dock.expand'),
-            'aria-expanded': expanded ? 'true' : 'false',
-            'data-aqd-toggle': '1',
-          },
-          h('span', { className: 'aqd-icon' }, gaugeIcon()),
-          h('span', { className: 'aqd-title' }, tr('dock.label')),
-          !state.loaded ? h('span', { className: 'aqd-muted' }, tr('dock.loading')) : null,
-          state.loaded && !sources ? h('span', { className: 'aqd-muted' }, tr('dock.never')) : null,
-          sources ? h('span', { className: 'aqd-chips' }, SOURCE_IDS.map((id) => renderChip(id, sources[id]))) : null,
-        ),
-        h(
-          'button',
-          {
-            type: 'button',
-            className: 'aqd-action',
-            onClick: onRefresh,
-            disabled: state.refreshing || !state.loaded,
-            title: state.refreshing ? tr('dock.refreshing') : tr('dock.refresh'),
-            'aria-label': state.refreshing ? tr('dock.refreshing') : tr('dock.refresh'),
-            'data-aqd-refresh': '1',
-          },
-          h('span', { className: state.refreshing ? 'aqd-spin' : undefined }, refreshIcon()),
-        ),
-      );
-
-      const panel = expanded
-        ? h(
-            'div',
-            { className: 'aqd-panel', role: 'group', 'aria-label': tr('dock.details') },
-            h(
-              'div',
-              { className: 'aqd-panel-head' },
-              h('span', { className: 'aqd-panel-title' }, tr('dock.details')),
-              h(
-                'span',
-                { className: 'aqd-panel-meta' },
-                lastUpdated(sources) ? tr('dock.updated', { time: fmtRelative(lastUpdated(sources)) }) : tr('dock.never'),
-              ),
-            ),
-            state.error ? h('div', { className: 'aqd-error' }, errorText(state.error)) : null,
-            !state.loaded ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.loading')) : null,
-            state.loaded && !sources ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.details.empty')) : null,
-            sources ? SOURCE_IDS.map((id) => renderSource(id, sources[id])) : null,
-            h(
-              'div',
-              { className: 'aqd-panel-foot' },
-              h('span', null, footerText(state)),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'aqd-textbtn',
-                  onClick: onRefresh,
-                  disabled: state.refreshing || !state.loaded,
-                },
-                state.refreshing ? tr('dock.refreshing') : tr('dock.refresh'),
-              ),
-            ),
-          )
-        : null;
-
       return h(
         'div',
         { className: 'aqd-root', 'data-plugin': 'ai-quota-dashboard' },
         h('style', { key: 'aqd-style' }, CSS),
-        strip,
-        panel,
+        h(
+          'div',
+          { className: 'aqd-strip' },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'aqd-toggle',
+              onClick: openDialog,
+              title: tr('dock.expand'),
+              'aria-haspopup': 'dialog',
+              'aria-expanded': state.open ? 'true' : 'false',
+              'data-aqd-toggle': '1',
+            },
+            h('span', { className: 'aqd-icon' }, gaugeIcon()),
+            h('span', { className: 'aqd-title' }, tr('dock.label')),
+            !state.loaded ? h('span', { className: 'aqd-muted' }, tr('dock.loading')) : null,
+            state.loaded && !sources ? h('span', { className: 'aqd-muted' }, tr('dock.never')) : null,
+            sources ? h('span', { className: 'aqd-chips' }, SOURCE_IDS.map((id) => renderChip(id, sources[id]))) : null,
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'aqd-action',
+              onClick: onRefresh,
+              disabled: state.refreshing || !state.loaded,
+              title: state.refreshing ? tr('dock.refreshing') : tr('dock.refresh'),
+              'aria-label': state.refreshing ? tr('dock.refreshing') : tr('dock.refresh'),
+              'data-aqd-refresh': '1',
+            },
+            h('span', { className: state.refreshing ? 'aqd-spin' : undefined }, refreshIcon()),
+          ),
+        ),
+      );
+    }
+
+    function closeIcon() {
+      return h(
+        'svg',
+        { viewBox: '0 0 16 16', width: 14, height: 14, fill: 'none', 'aria-hidden': true, focusable: false },
+        h('path', {
+          d: 'M4 4l8 8M12 4l-8 8',
+          stroke: 'currentColor',
+          'stroke-width': 1.5,
+          'stroke-linecap': 'round',
+        }),
+      );
+    }
+
+    function QuotaDialog() {
+      const [, setTick] = React.useState(0);
+      const state = store.get();
+      const view = state.view;
+      const sources = view && view.sources ? view.sources : null;
+      const open = state.open === true;
+
+      React.useEffect(() => store.subscribe(() => setTick((n) => n + 1)), []);
+
+      // Relative times and reset countdowns go stale while the dialog stays open.
+      React.useEffect(() => {
+        if (!open) return undefined;
+        const timer = setInterval(() => setTick((n) => n + 1), 30000);
+        return () => clearInterval(timer);
+      }, [open]);
+
+      React.useEffect(() => {
+        if (!open) return undefined;
+        const onKey = (event) => {
+          if (event.key !== 'Escape') return;
+          event.stopPropagation();
+          closeDialog();
+        };
+        if (typeof window !== 'undefined') window.addEventListener('keydown', onKey);
+        return () => {
+          if (typeof window !== 'undefined') window.removeEventListener('keydown', onKey);
+        };
+      }, [open]);
+
+      if (!open) return null;
+
+      const onRefresh = () => {
+        startRefresh();
+      };
+      const updated = lastUpdated(sources);
+
+      return h(
+        'div',
+        {
+          className: 'aqd-overlay',
+          'data-plugin': 'ai-quota-dashboard',
+          onMouseDown: (event) => {
+            if (event.target === event.currentTarget) closeDialog();
+          },
+        },
+        h('style', { key: 'aqd-style' }, CSS),
+        h(
+          'div',
+          {
+            className: 'aqd-dialog',
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-label': tr('dock.details'),
+            'data-aqd-dialog': '1',
+          },
+          h(
+            'div',
+            { className: 'aqd-dialog-head' },
+            h(
+              'div',
+              { className: 'aqd-dialog-titles' },
+              h('span', { className: 'aqd-dialog-title' }, tr('dock.details')),
+              h(
+                'span',
+                { className: 'aqd-dialog-meta' },
+                updated ? tr('dock.updated', { time: fmtRelative(updated) }) : tr('dock.never'),
+              ),
+            ),
+            h(
+              'button',
+              { type: 'button', className: 'aqd-close', onClick: closeDialog, 'aria-label': tr('dialog.close') },
+              closeIcon(),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'aqd-dialog-body' },
+            state.error ? h('div', { className: 'aqd-error' }, errorText(state.error)) : null,
+            !state.loaded ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.loading')) : null,
+            state.loaded && !sources ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.details.empty')) : null,
+            sources ? SOURCE_IDS.map((id) => renderSource(id, sources[id])) : null,
+          ),
+          h(
+            'div',
+            { className: 'aqd-dialog-foot' },
+            h('span', null, footerText(state)),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'aqd-textbtn',
+                onClick: onRefresh,
+                disabled: state.refreshing || !state.loaded,
+              },
+              state.refreshing ? tr('dock.refreshing') : tr('dock.refresh'),
+            ),
+          ),
+        ),
       );
     }
 
@@ -871,6 +1000,15 @@ window.__ModuleLoader__.load({
               ),
             ),
           'ai-quota-dashboard: dock entry',
+        );
+        // The dialog renders in the frame-wide overlay layer: the docked composer
+        // clips its own descendants, so a popup cannot live inside the dock.
+        ctx.effect(
+          () =>
+            ctx.slots.inject('shell.overlay', () =>
+              ctx.slots.register({ name: 'shell.overlay', id: 'ai-quota-dashboard.dialog', order: 50 }, QuotaDialog),
+            ),
+          'ai-quota-dashboard: dialog entry',
         );
       },
     };

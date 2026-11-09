@@ -14,12 +14,14 @@ export const EXIT = Object.freeze({
   timeout: 6,
   partial: 7,
   data: 8,
+  page: 9,
 });
 
 const CODE_EXIT = {
   cdp_unavailable: EXIT.cdp,
   not_logged_in: EXIT.login,
   parse_failed: EXIT.parse,
+  page_unreachable: EXIT.page,
   timeout: EXIT.timeout,
 };
 

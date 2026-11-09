@@ -71,6 +71,7 @@ export const SOURCE_STATUSES = Object.freeze([
   "manual",
   "not_logged_in",
   "parse_failed",
+  "page_unreachable",
   "timeout",
   "cdp_unavailable",
 ]);
@@ -84,6 +85,7 @@ export const SOURCE_STATUS_LABELS = Object.freeze({
   manual: "手动",
   not_logged_in: "浏览器未登录",
   parse_failed: "页面结构可能已变化",
+  page_unreachable: "页面打不开",
   timeout: "读取超时",
   cdp_unavailable: "调试端口未开",
 });
