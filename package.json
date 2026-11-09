@@ -2,9 +2,33 @@
   "name": "ai-quota-dashboard",
   "version": "0.2.0",
   "type": "module",
-  "description": "Local CLI + dashboard for AI subscription quotas, reading already-signed-in console pages through CDP.",
+  "description": "Local CLI + Harness plugin for AI subscription quotas, reading already-signed-in console pages through CDP.",
   "license": "MIT",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
   "bin": { "quota": "./bin/quota.js" },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "src/**",
+    "bin/**"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-ui-conversation"]
+    }
+  },
   "engines": { "node": ">=22" },
   "scripts": {
     "test": "node --test test/unit/*.test.js",

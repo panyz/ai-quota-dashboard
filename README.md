@@ -43,6 +43,25 @@ node bin/quota.js serve
 npm link        # 之后可直接用 quota
 ```
 
+## Harness 插件
+
+本仓库同时是一个 DSH（DeepSeek Harness）Cordis bundle 插件，可直接在 Harness Web 界面里使用：
+
+- Host 半部（`index.js`）注册 `GET /ai-quota/state` 与 `POST /ai-quota/refresh`，复用 `src/` 里同一套 store / refresh / view 逻辑；
+- Client 半部（`client.js`）在输入框上方的 `conversation.composer.dock` 插槽里放一条紧凑额度条，展开后显示每个来源的 5 小时 / 周 / 月明细、重置时间与刷新按钮。
+
+安装（在 Harness 里让 agent 执行，`target` 用本仓库绝对路径）：
+
+```text
+plugin_manager action=install_bundle target=/绝对路径/ai-quota-dashboard-for-github
+```
+
+装好后输入框上方会出现「AI 额度」条。点击刷新会在后台跑一次真实读取（`POST /ai-quota/refresh` → 202），界面轮询 `/ai-quota/state` 直到完成；没装 Chrome 调试端口时会显示「浏览器未连接」而不是卡住。
+
+- 插件与 CLI 共用 `~/.ai-quota-dashboard/state.json`，不额外落盘、不上传；
+- `install_bundle` 对已安装的包会报 `already-installed`；改了 `client.js` 后可以先 `remove_bundle` 再装，或直接重启 Harness（`pnpm run dev:web` 运行时才走 HMR）；
+- 卸载：`plugin_manager action=remove_bundle target=ai-quota-dashboard`；只想临时关掉的话，先 `list_plugins` 查到该插件的 `entryId`，再 `set_plugin` 置 `enabled=false`（bundle 名和 entryId 不是一回事）。
+
 ## 命令
 
 ```bash
