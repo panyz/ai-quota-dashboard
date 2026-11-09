@@ -2,10 +2,11 @@
  * Client half of the AI quota dashboard plugin.
  *
  * Renders a compact strip in the composer dock: one chip per quota source plus
- * a refresh action. Clicking the strip opens a dialog, rendered in the
- * frame-wide `shell.overlay` slot (the docked composer clips its own subtree),
+ * a refresh action. Clicking the strip opens a popover directly above it,
  * listing every window (5h / week / month) with its remaining amount and reset
- * countdown.
+ * countdown. The popover renders in the frame-wide `shell.overlay` slot (the
+ * docked composer clips its own subtree) and is positioned with fixed
+ * coordinates measured from the trigger: no backdrop, no modal.
  *
  * Data comes from the plugin's own same-origin routes registered by index.js.
  */
@@ -207,44 +208,40 @@ window.__ModuleLoader__.load({
 .aqd-spin { animation: aqd-spin 1s linear infinite; }
 @keyframes aqd-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .aqd-spin { animation-duration: 2.4s; } }
-.aqd-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: color-mix(in srgb, var(--dsw-alias-label-primary) 32%, transparent);
-  animation: aqd-fade 120ms ease-out;
-}
-@keyframes aqd-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .aqd-overlay { animation: none; } }
-.aqd-dialog {
+.aqd-pop {
   box-sizing: border-box;
+  z-index: 1100;
   display: flex;
   flex-direction: column;
-  width: min(460px, 100%);
-  max-height: min(70vh, 560px);
-  border: 1px solid var(--dsw-alias-border-l1);
+  overflow: hidden;
+  padding: 0;
+  border: 0;
   border-radius: var(--dsw-radius-lg);
-  background: var(--dsw-alias-bg-overlay);
-  box-shadow: var(--dsw-elevation-panel);
+  background: var(--dsw-specific-menu);
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
+  box-shadow: var(--dsw-elevation-prominent);
   color: var(--dsw-alias-label-primary);
   font-size: 12px;
   line-height: 18px;
+  animation: aqd-pop-in 120ms ease-out;
 }
-.aqd-dialog-head {
+@keyframes aqd-pop-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .aqd-pop { animation: none; } }
+.aqd-pop-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 12px 10px 16px;
+  padding: 12px 8px 8px 14px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
-.aqd-dialog-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.aqd-dialog-title { font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary); }
-.aqd-dialog-meta {
+.aqd-pop-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.aqd-pop-title { font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-primary); }
+.aqd-pop-meta {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -257,8 +254,8 @@ window.__ModuleLoader__.load({
   display: grid;
   place-items: center;
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -268,12 +265,12 @@ window.__ModuleLoader__.load({
 }
 .aqd-close:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
 .aqd-close:focus-visible { outline: 1px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
-.aqd-dialog-body {
+.aqd-pop-body {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 12px 6px;
+  padding: 2px 12px 4px;
 }
 .aqd-src { display: flex; flex-direction: column; gap: 6px; padding: 8px 4px; }
 .aqd-src + .aqd-src { border-top: 1px solid var(--dsw-alias-border-l1); }
@@ -318,12 +315,12 @@ window.__ModuleLoader__.load({
   font-size: 11px;
   color: var(--dsw-alias-state-error-primary);
 }
-.aqd-dialog-foot {
+.aqd-pop-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 16px 12px;
+  padding: 8px 14px 10px;
   border-top: 1px solid var(--dsw-alias-border-l1);
   font-size: 11px;
   color: var(--dsw-alias-label-secondary);
@@ -390,10 +387,30 @@ window.__ModuleLoader__.load({
       error: null,
       lastResult: null,
       open: false,
+      anchor: null,
     });
 
-    function openDialog() {
-      store.set((current) => ({ ...current, open: true }));
+    /**
+    * The trigger's viewport rect, so the popover can sit directly above it.
+    * @param {Element|null|undefined} element
+    * @returns {{left:number,right:number,top:number,bottom:number,width:number,height:number}|null}
+    */
+    function rectOf(element) {
+      if (!element || typeof element.getBoundingClientRect !== 'function') return null;
+      const rect = element.getBoundingClientRect();
+      if (!rect || !Number.isFinite(rect.top)) return null;
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    }
+
+    function openDialog(anchor) {
+      store.set((current) => ({ ...current, open: true, anchor: anchor ?? current.anchor }));
     }
 
     function closeDialog() {
@@ -826,7 +843,13 @@ window.__ModuleLoader__.load({
             {
               type: 'button',
               className: 'aqd-toggle',
-              onClick: openDialog,
+              onClick: (event) => {
+                if (state.open) {
+                  closeDialog();
+                  return;
+                }
+                openDialog(rectOf(event && event.currentTarget));
+              },
               title: tr('dock.expand'),
               'aria-haspopup': 'dialog',
               'aria-expanded': state.open ? 'true' : 'false',
@@ -868,7 +891,35 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function QuotaDialog() {
+    const POP_GAP = 8;
+    const POP_MARGIN = 12;
+    const POP_WIDTH = 400;
+
+    /** Place the popover above the trigger, clamped to the viewport. */
+    function popoverStyle(anchor, viewport) {
+      const width = Math.min(POP_WIDTH, viewport.width - POP_MARGIN * 2);
+      const center = anchor ? anchor.left + anchor.width / 2 : viewport.width / 2;
+      const left = Math.max(POP_MARGIN, Math.min(center - width / 2, viewport.width - width - POP_MARGIN));
+      const anchorTop = anchor ? anchor.top : viewport.height - POP_MARGIN - POP_GAP;
+      const maxHeight = Math.max(160, Math.min(anchorTop - POP_GAP - POP_MARGIN, viewport.height * 0.7));
+      return {
+        position: 'fixed',
+        left: left + 'px',
+        width: width + 'px',
+        bottom: Math.round(viewport.height - anchorTop + POP_GAP) + 'px',
+        maxHeight: Math.round(maxHeight) + 'px',
+      };
+    }
+
+    function viewportSize() {
+      if (typeof window === 'undefined') return { width: 1280, height: 800 };
+      return {
+        width: window.innerWidth || 1280,
+        height: window.innerHeight || 800,
+      };
+    }
+
+    function QuotaPopover() {
       const [, setTick] = React.useState(0);
       const state = store.get();
       const view = state.view;
@@ -877,7 +928,7 @@ window.__ModuleLoader__.load({
 
       React.useEffect(() => store.subscribe(() => setTick((n) => n + 1)), []);
 
-      // Relative times and reset countdowns go stale while the dialog stays open.
+      // Relative times and reset countdowns go stale while the popover stays open.
       React.useEffect(() => {
         if (!open) return undefined;
         const timer = setInterval(() => setTick((n) => n + 1), 30000);
@@ -897,73 +948,90 @@ window.__ModuleLoader__.load({
         };
       }, [open]);
 
+      // Anchor follows layout: the composer moves on resize and on transcript scroll.
+      React.useEffect(() => {
+        if (!open) return undefined;
+        const remeasure = () => {
+          if (typeof document === 'undefined') return;
+          openDialog(rectOf(document.querySelector('[data-aqd-toggle]')));
+          setTick((n) => n + 1);
+        };
+        if (typeof window === 'undefined') return undefined;
+        window.addEventListener('resize', remeasure);
+        window.addEventListener('scroll', remeasure, true);
+        return () => {
+          window.removeEventListener('resize', remeasure);
+          window.removeEventListener('scroll', remeasure, true);
+        };
+      }, [open]);
+
+      // No backdrop: a pointer down anywhere outside the trigger and the panel closes it.
+      React.useEffect(() => {
+        if (!open || typeof document === 'undefined') return undefined;
+        const onPointerDown = (event) => {
+          const target = event.target;
+          if (target && typeof target.closest === 'function' && target.closest('[data-aqd-pop],[data-aqd-toggle]')) return;
+          closeDialog();
+        };
+        document.addEventListener('pointerdown', onPointerDown, true);
+        return () => document.removeEventListener('pointerdown', onPointerDown, true);
+      }, [open]);
+
       if (!open) return null;
 
       const onRefresh = () => {
         startRefresh();
       };
       const updated = lastUpdated(sources);
+      const style = popoverStyle(state.anchor, viewportSize());
 
       return h(
         'div',
         {
-          className: 'aqd-overlay',
+          className: 'aqd-pop',
+          style,
+          role: 'dialog',
+          'aria-label': tr('dock.details'),
+          'data-aqd-pop': '1',
           'data-plugin': 'ai-quota-dashboard',
-          onMouseDown: (event) => {
-            if (event.target === event.currentTarget) closeDialog();
-          },
         },
         h('style', { key: 'aqd-style' }, CSS),
         h(
           'div',
-          {
-            className: 'aqd-dialog',
-            role: 'dialog',
-            'aria-modal': 'true',
-            'aria-label': tr('dock.details'),
-            'data-aqd-dialog': '1',
-          },
+          { className: 'aqd-pop-head' },
           h(
             'div',
-            { className: 'aqd-dialog-head' },
+            { className: 'aqd-pop-titles' },
+            h('span', { className: 'aqd-pop-title' }, tr('dock.details')),
             h(
-              'div',
-              { className: 'aqd-dialog-titles' },
-              h('span', { className: 'aqd-dialog-title' }, tr('dock.details')),
-              h(
-                'span',
-                { className: 'aqd-dialog-meta' },
-                updated ? tr('dock.updated', { time: fmtRelative(updated) }) : tr('dock.never'),
-              ),
-            ),
-            h(
-              'button',
-              { type: 'button', className: 'aqd-close', onClick: closeDialog, 'aria-label': tr('dialog.close') },
-              closeIcon(),
+              'span',
+              { className: 'aqd-pop-meta' },
+              updated ? tr('dock.updated', { time: fmtRelative(updated) }) : tr('dock.never'),
             ),
           ),
+          h('button', { type: 'button', className: 'aqd-close', onClick: closeDialog, 'aria-label': tr('dialog.close') }, closeIcon()),
+        ),
+        h(
+          'div',
+          { className: 'aqd-pop-body' },
+          state.error ? h('div', { className: 'aqd-error' }, errorText(state.error)) : null,
+          !state.loaded ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.loading')) : null,
+          state.loaded && !sources ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.details.empty')) : null,
+          sources ? SOURCE_IDS.map((id) => renderSource(id, sources[id])) : null,
+        ),
+        h(
+          'div',
+          { className: 'aqd-pop-foot' },
+          h('span', null, footerText(state)),
           h(
-            'div',
-            { className: 'aqd-dialog-body' },
-            state.error ? h('div', { className: 'aqd-error' }, errorText(state.error)) : null,
-            !state.loaded ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.loading')) : null,
-            state.loaded && !sources ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.details.empty')) : null,
-            sources ? SOURCE_IDS.map((id) => renderSource(id, sources[id])) : null,
-          ),
-          h(
-            'div',
-            { className: 'aqd-dialog-foot' },
-            h('span', null, footerText(state)),
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'aqd-textbtn',
-                onClick: onRefresh,
-                disabled: state.refreshing || !state.loaded,
-              },
-              state.refreshing ? tr('dock.refreshing') : tr('dock.refresh'),
-            ),
+            'button',
+            {
+              type: 'button',
+              className: 'aqd-textbtn',
+              onClick: onRefresh,
+              disabled: state.refreshing || !state.loaded,
+            },
+            state.refreshing ? tr('dock.refreshing') : tr('dock.refresh'),
           ),
         ),
       );
@@ -1006,7 +1074,7 @@ window.__ModuleLoader__.load({
         ctx.effect(
           () =>
             ctx.slots.inject('shell.overlay', () =>
-              ctx.slots.register({ name: 'shell.overlay', id: 'ai-quota-dashboard.dialog', order: 50 }, QuotaDialog),
+              ctx.slots.register({ name: 'shell.overlay', id: 'ai-quota-dashboard.popover', order: 50 }, QuotaPopover),
             ),
           'ai-quota-dashboard: dialog entry',
         );

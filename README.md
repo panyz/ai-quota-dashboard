@@ -48,7 +48,7 @@ npm link        # 之后可直接用 quota
 本仓库同时是一个 DSH（DeepSeek Harness）Cordis bundle 插件，可直接在 Harness Web 界面里使用：
 
 - Host 半部（`index.js`）注册 `GET /ai-quota/state` 与 `POST /ai-quota/refresh`，复用 `src/` 里同一套 store / refresh / view 逻辑；
-- Client 半部（`client.js`）在输入框上方的 `conversation.composer.dock` 插槽里放一条紧凑额度条；点击后弹窗展示每个来源的 5 小时 / 周 / 月明细、重置时间与刷新按钮。弹窗挂在框架级 `shell.overlay` 插槽里，因为输入框容器会裁剪自己的子元素。
+- Client 半部（`client.js`）在输入框上方的 `conversation.composer.dock` 插槽里放一条紧凑额度条；点击后在额度条正上方浮出一层明细（每个来源的 5 小时 / 周 / 月、重置时间与刷新按钮），没有遮罩、不抢焦点。浮层挂在框架级 `shell.overlay` 插槽里、按额度条的实测位置用 fixed 坐标定位，因为输入框容器会裁剪自己的子元素。
 
 安装（在 Harness 里让 agent 执行，`target` 用本仓库绝对路径）：
 
@@ -56,7 +56,7 @@ npm link        # 之后可直接用 quota
 plugin_manager action=install_bundle target=/绝对路径/ai-quota-dashboard-for-github
 ```
 
-装好后输入框上方会出现「AI 额度」条，点一下弹窗看明细（Esc、点遮罩或点关闭都能收起）。点击刷新会在后台跑一次真实读取（`POST /ai-quota/refresh` → 202），界面轮询 `/ai-quota/state` 直到完成；没装 Chrome 调试端口时会显示「浏览器未连接」而不是卡住。
+装好后输入框上方会出现「AI 额度」条，点一下在它上方浮出明细（Esc、点浮层外面、点关闭按钮、或再点一次额度条都能收起）。点击刷新会在后台跑一次真实读取（`POST /ai-quota/refresh` → 202），界面轮询 `/ai-quota/state` 直到完成；没装 Chrome 调试端口时会显示「浏览器未连接」而不是卡住。
 
 - 插件与 CLI 共用 `~/.ai-quota-dashboard/state.json`，不额外落盘、不上传；
 - `install_bundle` 对已安装的包会报 `already-installed`；改了 `client.js` 后可以先 `remove_bundle` 再装，或直接重启 Harness（`pnpm run dev:web` 运行时才走 HMR）；
