@@ -6,7 +6,10 @@
 //   近一月用量 / 4天8小时后重置 / 18.41 / % / 0% 50% 100%
 //
 // The page shows PERCENT USED, not remaining: remaining = 100 - used, total = 100, unit = "%".
-// The 0%/50%/100% scale labels are not values. Anything unrecognised is parse_failed — never a guess.
+// The 0%/50%/100% scale labels are not values: each carries its own "%" sign, either on one
+// line ("0% 50% 100%") or on three ("0%", "50%", "100%"). The used value is a bare number with
+// "%" on the next line, so a bare 0/50/100 in that slot is a real value.
+// Anything unrecognised is parse_failed — never a guess.
 
 const SIGNED_OUT = [/立即登录使用/, /^登录$/m];
 
@@ -52,8 +55,10 @@ const RESET_TEXT = /([0-9]+\s*(?:天|小时|时|分钟|分|秒)(?:\s*[0-9]+\s*(?
 const SCALE = new Set(["0", "50", "100"]);
 
 /**
- * Percentage used inside one window block. The value may be on its own line with "%" on the next
- * line, or inline. Scale labels (0/50/100) are skipped.
+ * Percentage used inside one window block. The value is a bare number with "%"
+ * on the next line, or inline. Scale labels always carry their own "%" sign
+ * ("0%", "50%", "100%"), so a bare 0/50/100 in the value slot is a genuine
+ * percentage (e.g. an exhausted window rendering "100" + "%").
  * @param {string[]} block
  * @returns {number|null}
  */
@@ -62,7 +67,7 @@ export function readUsedPercent(block) {
     const line = block[i];
     if (line.includes("剩余")) continue; // a "remaining …%" line is not a used percentage
     const standalone = line.match(/^(\d+(?:\.\d+)?)$/);
-    if (standalone && block[i + 1] === "%" && !SCALE.has(standalone[1])) return Number(standalone[1]);
+    if (standalone && block[i + 1] === "%") return Number(standalone[1]);
     // "1.12 %" on one line, or "… 1.12%" (but not the "0% 50% 100%" ruler)
     if (line.includes("0%") && line.includes("100%")) continue;
     const inline = line.match(/^(\d+(?:\.\d+)?)\s*%$/);

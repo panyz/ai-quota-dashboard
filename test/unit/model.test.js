@@ -35,22 +35,27 @@ test("per-window status: ok / stale / expired / reset_passed", () => {
   assert.equal(deriveWindowStatus(w({ resetAt: "2026-11-05T11:59:00.000Z" }), NOW), "reset_passed");
 });
 
-test("windows are independent: one stale does not age another", () => {
+test("windows are independent: freshness follows each window's own period", () => {
   const doc = emptyState();
-  doc.sources.volcengine.windows.h5 = w({ updatedAt: "2026-11-05T11:30:00.000Z" });
+  doc.sources.volcengine.windows.h5 = w({ updatedAt: "2026-11-05T06:00:00.000Z" });
   doc.sources.volcengine.windows.week = w({ updatedAt: "2026-11-04T11:00:00.000Z" });
-  doc.sources.volcengine.windows.month = w({ updatedAt: "2026-11-02T11:00:00.000Z" });
+  doc.sources.volcengine.windows.month = w({ updatedAt: "2026-07-01T12:00:00.000Z" });
   const { state } = normalizeState(clone(doc));
-  assert.equal(deriveWindowStatus(state.sources.volcengine.windows.h5, NOW), "ok");
-  assert.equal(deriveWindowStatus(state.sources.volcengine.windows.week, NOW), "stale");
+  assert.equal(deriveWindowStatus(state.sources.volcengine.windows.h5, NOW), "stale");
+  assert.equal(deriveWindowStatus(state.sources.volcengine.windows.week, NOW), "ok");
   assert.equal(deriveWindowStatus(state.sources.volcengine.windows.month, NOW), "expired");
 });
 
-test("normalizeWindow refuses zero-unit, negative remaining and bad total", () => {
-  assert.equal(normalizeWindow({ remaining: 1, unit: "" }, "h5"), null);
-  assert.equal(normalizeWindow({ remaining: -1, unit: "次" }, "h5"), null);
-  assert.equal(normalizeWindow({ remaining: 1, total: 0, unit: "次" }, "h5"), null);
-  assert.equal(normalizeWindow({ remaining: 1, unit: "次" }, "h5").total, null);
+test("normalizeWindow refuses empty unit, negative remaining, bad total, and percent above 100", () => {
+  assert.equal(normalizeWindow({ remaining: 1, unit: "" }, "credits"), null);
+  assert.equal(normalizeWindow({ remaining: -1, unit: "次" }, "credits"), null);
+  assert.equal(normalizeWindow({ remaining: 1, total: 0, unit: "次" }, "credits"), null);
+  assert.equal(normalizeWindow({ remaining: 1, unit: "次" }, "credits").total, null);
+  assert.equal(normalizeWindow({ remaining: 101, unit: "%" }, "h5"), null);
+  const percent = normalizeWindow({ remaining: 40, unit: "次" }, "h5");
+  assert.equal(percent.unit, "%");
+  assert.equal(percent.total, 100);
+  assert.equal(percent.remaining, 40);
 });
 
 test("a window without updatedAt cannot be displayed as current", () => {
@@ -103,31 +108,54 @@ test("effective default: explicit window missing means window-missing", () => {
   });
 });
 
-test("strict schemaVersion: current parses, current+1 and current-1 are refused", () => {
+test("schemaVersion: current parses, a newer file is refused, v1 is refused", () => {
   const okDoc = emptyState();
   assert.equal(normalizeState(clone(okDoc)).state.schemaVersion, SCHEMA_VERSION);
+  assert.equal(normalizeState(clone(okDoc)).migrated, false);
 
   const future = clone(okDoc);
   future.schemaVersion = SCHEMA_VERSION + 1;
   assert.throws(() => normalizeState(future), (e) => e.code === "UNKNOWN_VERSION");
 
-  const old = clone(okDoc);
-  old.schemaVersion = SCHEMA_VERSION - 1;
-  assert.throws(() => normalizeState(old), (e) => e.code === "STALE_VERSION");
+  const ancient = clone(okDoc);
+  ancient.schemaVersion = 1;
+  assert.throws(() => normalizeState(ancient), (e) => e.code === "STALE_VERSION");
 });
 
-test("no implicit migration: a legacy v2 quota/extras document is refused, not converted", () => {
+test("v2 state migrates and keeps declared windows, undeclared windows move to legacyWindows", () => {
+  const updatedAt = "2026-11-05T11:00:00.000Z";
+  const doc = {
+    schemaVersion: 2,
+    sources: {
+      volcengine: {
+        status: "ok",
+        windows: {
+          h5: { remaining: 98.88, total: 100, unit: "%", resetAt: null, updatedAt, window: "h5" },
+          day: { remaining: 3, total: 10, unit: "次", updatedAt, window: "day" },
+        },
+      },
+    },
+    meta: { lastFetchAt: updatedAt, defaultWindow: { volcengine: "week" } },
+  };
+  const { state, migrated } = normalizeState(doc, NOW);
+  assert.equal(migrated, true);
+  assert.equal(state.schemaVersion, 3);
+  assert.equal(state.sources.volcengine.windows.h5.remaining, 98.88);
+  assert.equal(state.sources.volcengine.windows.week, null);
+  assert.equal(state.sources.volcengine.legacyWindows.day.remaining, 3);
+  assert.equal(state.meta.defaultWindow.volcengine, "week");
+  assert.equal(state.meta.lastFetchAt, updatedAt);
+  assert.equal(state.meta.migratedFrom, 2);
+});
+
+test("a v2 document that is not a window record migrates without inventing numbers", () => {
   const legacy = {
     schemaVersion: 2,
     sources: { opencode: { quota: { remaining: 95, unit: "%", label: "5 小时" }, updatedAt: NOW.toISOString() } },
   };
-  if (SCHEMA_VERSION === 2) {
-    // same number, different shape: it parses but yields no windows rather than migrating
-    const { state } = normalizeState(legacy);
-    assert.equal(state.sources.opencode_go.windows.h5, null);
-  } else {
-    assert.throws(() => normalizeState(legacy), (e) => ["STALE_VERSION", "UNKNOWN_VERSION"].includes(e.code));
-  }
+  const { state, migrated } = normalizeState(legacy, NOW);
+  assert.equal(migrated, true);
+  assert.equal(state.sources.opencode_go.windows.h5, null);
 });
 
 test("corrupt documents are refused", () => {

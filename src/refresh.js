@@ -1,4 +1,4 @@
-import { SOURCE_IDS, WINDOW_KEYS, SOURCES, advertisedWindows, resolveSource } from "./model.js";
+import { SOURCE_IDS, SOURCES, advertisedWindows, resolveSource, windowOrder } from "./model.js";
 import { readSource } from "./adapters/index.js";
 import { mockMode, mockRead } from "./mock.js";
 import { updateState, readState } from "./store.js";
@@ -73,7 +73,7 @@ export async function performFetch({ ids, timeoutSec = 30, keepTab = false, now 
         continue;
       }
       const missing = advertisedWindows(id).filter((key) => !read.windows?.[key]);
-      for (const key of WINDOW_KEYS) {
+      for (const key of windowOrder(id)) {
         const w = read.windows?.[key];
         if (!w) continue; // keep previous value for windows not read this time
         source.windows[key] = { ...w, window: key, updatedAt: stamp };

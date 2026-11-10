@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { parseVolcengine, durationToMs, readUsedPercent } from "../../src/parsers/volcengine.js";
 
 const subscribe = readFileSync(new URL("../fixtures/volc-subscribe.txt", import.meta.url), "utf8");
+const exhausted = readFileSync(new URL("../fixtures/volc-subscribe-exhausted.txt", import.meta.url), "utf8");
 const signedOut = readFileSync(new URL("../fixtures/volc-signed-out.txt", import.meta.url), "utf8");
 const NOW = new Date("2026-11-07T12:00:00.000Z");
 
@@ -40,10 +41,28 @@ test("reset countdowns become absolute resetAt", () => {
 test("the 0%/50%/100% ruler is never read as a value", () => {
   const block = ["0% 50% 100%", "0% 50% 100%"];
   assert.equal(readUsedPercent(block), null);
+  assert.equal(readUsedPercent(["0%", "50%", "100%"]), null);
+  assert.equal(readUsedPercent(["近5小时用量", "0%", "50%", "100%"]), null);
   const r = parseVolcengine(subscribe, NOW);
   for (const k of ["h5", "week", "month"]) {
     assert.ok(![0, 50, 100].includes(r.windows[k].remaining), `${k} leaked a scale label`);
   }
+});
+
+test("a real 0/50/100 used% in the value slot is a value, not the ruler", () => {
+  // The value is a bare number with "%" on the next line; the ruler is inline.
+  assert.equal(readUsedPercent(["100", "%", "0%", "50%", "100%"]), 100);
+  assert.equal(readUsedPercent(["0", "%", "0%", "50%", "100%"]), 0);
+  assert.equal(readUsedPercent(["50", "%", "0%", "50%", "100%"]), 50);
+});
+
+test("exhausted 5h window on the live layout: used 100 => remaining 0, not dropped", () => {
+  const r = parseVolcengine(exhausted, NOW);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(Object.keys(r.windows).sort(), ["h5", "month", "week"]);
+  assert.equal(r.windows.h5.remaining, 0); // 100 - 100
+  assert.equal(r.windows.week.remaining, 74.91); // 100 - 25.09
+  assert.equal(r.windows.month.remaining, 68.02); // 100 - 31.98
 });
 
 test("only one window present is parsed (fetch layer marks partial)", () => {

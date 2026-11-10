@@ -1,19 +1,43 @@
-import { SOURCES } from "../model.js";
-import { parseOpenCode } from "../parsers/opencode.js";
-import { parseVolcengine } from "../parsers/volcengine.js";
-import { parseGrok } from "../parsers/grok.js";
-import { cdpVersion, createTarget, closeTarget, evaluate, listTargets, waitFor, sleep } from "../cdp.js";
+import { SOURCES, registry } from "../model.js";
+import { parserFor } from "../parsers/index.js";
+import {
+  cdpVersion,
+  createTarget,
+  closeTarget,
+  evaluate,
+  listTargets,
+  reloadTarget,
+  waitFor,
+  sleep,
+} from "../cdp.js";
 
-const READY = {
-  opencode_go: () =>
-    `document.body.innerText.includes('5-hour window') || document.body.innerText.includes('Rolling') || /SIGN IN|OPEN CONSOLE|Go is a subscription/.test(document.body.innerText)`,
-  volcengine: () =>
-    `document.body.innerText.includes('套餐用量限额') || document.body.innerText.includes('我的订阅') || document.body.innerText.includes('开通管理')`,
-  x_premium: () =>
-    `document.body.innerText.includes('Weekly included usage') || document.body.innerText.includes('Weekly SuperGrok Limit') || /Sign in|Log in|Continue with/.test(document.body.innerText)`,
-};
+// "Ready" means the page has rendered its numbers, not just its labels: after a
+// reload the labels exist before the usage request resolves, and reading then
+// would cache a placeholder as a real quota. Exported so unit tests can run the
+// expressions against real captured pages.
+/** Page-ready expressions, taken from each provider manifest. */
+export const READY_CHECKS = Object.fromEntries(
+  registry.ids().filter((id) => registry.get(id).ready?.expr).map((id) => [id, () => registry.get(id).ready.expr]),
+);
 
-const PARSERS = { opencode_go: parseOpenCode, volcengine: parseVolcengine, x_premium: parseGrok };
+const PAGE_LOAD_TIMEOUT_MS = 15000;
+const RELOAD_TIMEOUT_MS = 10000;
+const SETTLE_ROUNDS = 4;
+const SETTLE_GAP_MS = 500;
+
+/** Time left in this source's budget, never negative. */
+const left = (deadline) => Math.max(0, deadline - Date.now());
+/** A wait timeout clamped to what the caller's budget still allows. */
+const budget = (deadline, cap) => Math.max(200, Math.min(cap, left(deadline)));
+
+/** evaluate() clamped to this source's remaining budget, so a hung renderer cannot eat it. */
+function evaluateWithin(tabId, expression, deadline, { awaitPromise = true } = {}) {
+  return evaluate(tabId, expression, {
+    awaitPromise,
+    timeoutMs: budget(deadline, 2500),
+    sendTimeoutMs: budget(deadline, 3000),
+  });
+}
 
 /**
  * Chrome's own error page is not the product's HTML: classifying it as a parse
@@ -47,13 +71,120 @@ export function classifyUnreachable(finalUrl, text) {
 }
 
 /**
+ * Wait until the tab shows a document created after `startedAt`, i.e. the
+ * reload/navigation we just asked for actually landed. Comparing against the
+ * pre-reload document would need a second round-trip; the wall clock and
+ * performance.timeOrigin come from the same machine, so one number is enough.
+ * @returns {Promise<boolean>} false when no new document arrived within the budget
+ */
+async function waitForReloadedDocument(tabId, startedAt, timeoutMs) {
+  const expression = `document.readyState === 'complete' && performance.timeOrigin >= ${startedAt - 100}`;
+  try {
+    await waitFor(tabId, expression, { timeoutMs, intervalMs: 300 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Navigate one tab and wait for the new document, not the outgoing one. */
+async function navigateTab(tabId, url, deadline) {
+  const startedAt = Date.now();
+  await evaluateWithin(tabId, `location.href=${JSON.stringify(url)}`, deadline, { awaitPromise: false }).catch(
+    () => {},
+  );
+  return waitForReloadedDocument(tabId, startedAt, budget(deadline, PAGE_LOAD_TIMEOUT_MS));
+}
+
+/**
+ * Find the console tab for a source, or open one, and make sure its document is
+ * fresh before anything reads it.
+ *
+ * Reusing a tab as-is is not safe: these consoles render their quota snapshot at
+ * load time and never poll, so a tab left open keeps showing the numbers from
+ * when it was opened. Reading it would "refresh" to the same stale values
+ * forever (and parse relative reset countdowns against the current clock).
+ * So a reused tab is reloaded; a created or navigated tab loads its own document.
+ *
+ * `fresh:false` means the requested reload never produced a new document — the
+ * caller must report that instead of returning the old numbers as a success.
+ */
+async function openFreshTab(id, { deadline }) {
+  const url = SOURCES[id].url;
+  const origin = new URL(url).origin;
+  const pages = await listTargets();
+  let tab = pages.find((p) => p.url.startsWith(origin)) ?? null;
+  if (!tab) {
+    tab = await createTarget(url, { background: true, timeoutMs: budget(deadline, RELOAD_TIMEOUT_MS) });
+    await waitFor(tab.id, "document.readyState === 'complete'", {
+      timeoutMs: budget(deadline, PAGE_LOAD_TIMEOUT_MS),
+      intervalMs: 300,
+    }).catch(() => {});
+    return { tab, created: true, fresh: true };
+  }
+
+  const startedAt = Date.now();
+  if (isReuseableTab(id, tab.url) || tab.url.startsWith(url.split("?")[0])) {
+    await reloadTarget(tab.id, { timeoutMs: budget(deadline, RELOAD_TIMEOUT_MS) }).catch(async () => {
+      await evaluateWithin(tab.id, "location.reload()", deadline, { awaitPromise: false }).catch(() => {});
+    });
+  } else {
+    await evaluateWithin(tab.id, `location.href=${JSON.stringify(url)}`, deadline, { awaitPromise: false }).catch(
+      () => {},
+    );
+  }
+  const fresh = await waitForReloadedDocument(tab.id, startedAt, budget(deadline, PAGE_LOAD_TIMEOUT_MS));
+  return { tab, created: false, fresh };
+}
+
+/** Values only (no reset times), so two samples of the same quota compare equal. */
+function quotaSignature(parsed) {
+  if (!parsed || parsed.ok !== true || !parsed.windows) return null;
+  return Object.keys(parsed.windows)
+    .sort()
+    .map((key) => {
+      const w = parsed.windows[key] || {};
+      return `${key}:${w.remaining}/${w.total ?? ""}/${w.unit ?? ""}`;
+    })
+    .join("|");
+}
+
+/**
+ * Read innerText until two consecutive samples parse to the same numbers (or the
+ * budget runs out). A page that paints a placeholder before its usage request
+ * resolves would otherwise be cached as a real quota.
+ *
+ * Honest limit: this only catches placeholders shorter than one sample gap
+ * (~500ms). The three consoles paint explicit loading copy ("用量加载中", "…")
+ * instead of a fake 0, and READY waits for real numbers, so that is enough here.
+ */
+async function readSettled(tabId, parse, deadline) {
+  let text = "";
+  let parsed = null;
+  let previous = null;
+  for (let round = 0; round < SETTLE_ROUNDS; round++) {
+    if (round > 0) {
+      if (left(deadline) < SETTLE_GAP_MS + 200) break;
+      await sleep(SETTLE_GAP_MS);
+    }
+    text = await evaluateWithin(tabId, "document.body.innerText || ''", deadline);
+    parsed = parse(text, new Date());
+    const signature = quotaSignature(parsed);
+    if (signature !== null && signature === previous) return { text, parsed };
+    previous = signature;
+  }
+  return { text, parsed };
+}
+
+/**
  * Read one auto source through the already-signed-in console tab.
  * Resolves { ok:true, windows, mainWindow, adapterVersion } | { ok:false, code, message }.
  * Never writes storage, never touches cookies/tokens, never clicks.
  */
 export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}) {
-  if (!PARSERS[id]) return { ok: false, code: "unsupported", message: `${id} 不支持自动读取` };
-  const url = SOURCES[id].url;
+  const parse = parserFor(id);
+  if (!parse) return { ok: false, code: "unsupported", message: `${id} 不支持自动读取` };
+  const deadline = Date.now() + Math.max(1000, Number(timeoutMs) || 30000);
   try {
     await cdpVersion({ timeoutMs: 3000 });
   } catch {
@@ -63,27 +194,28 @@ export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}
   let tab = null;
   let created = false;
   try {
-    const pages = await listTargets();
-    const origin = new URL(url).origin;
-    tab = pages.find((p) => p.url.startsWith(origin)) ?? null;
-    if (!tab) {
-      tab = await createTarget(url, { background: true });
-      created = true;
-    } else if (!isReuseableTab(id, tab.url) && !tab.url.startsWith(url.split("?")[0])) {
-      await evaluate(tab.id, `location.href=${JSON.stringify(url)}`, { awaitPromise: false }).catch(() => {});
+    let fresh = false;
+    ({ tab, created, fresh } = await openFreshTab(id, { deadline }));
+    if (!fresh) {
+      return {
+        ok: false,
+        code: "timeout",
+        message: "控制台标签页重新加载后未拿到新文档，本次不读旧数据（检查页面是否被拦截或网络异常）",
+      };
+    }
+    await waitFor(tab.id, READY_CHECKS[id](), { timeoutMs: budget(deadline, 20000), intervalMs: 500 }).catch(() => {});
+    if (id === "opencode_go") await preferWorkspaceGoPage(tab.id, deadline);
+    if (id === "x_premium") await preferGrokUsagePage(tab.id, deadline);
+    // A read needs at least the settle budget; don't start one that cannot finish.
+    if (left(deadline) < 1000) {
+      return { ok: false, code: "timeout", message: "命令总超时预算已用尽" };
     }
 
-    await waitFor(tab.id, "document.readyState === 'complete'", { timeoutMs: 15000, intervalMs: 300 });
-    await waitFor(tab.id, READY[id](), { timeoutMs: Math.min(20000, timeoutMs), intervalMs: 500 }).catch(() => {});
-    if (id === "opencode_go") await preferWorkspaceGoPage(tab.id);
-    if (id === "x_premium") await preferGrokUsagePage(tab.id);
-    await sleep(600);
-
-    const text = await evaluate(tab.id, "document.body.innerText || ''");
-    const finalUrl = await evaluate(tab.id, "location.href").catch(() => "");
+    const { text, parsed } = await readSettled(tab.id, parse, deadline);
+    const finalUrl = await evaluateWithin(tab.id, "location.href", deadline).catch(() => "");
     const unreachable = classifyUnreachable(finalUrl, text);
     if (unreachable) return { ok: false, ...unreachable };
-    return PARSERS[id](text, new Date());
+    return parsed;
   } catch (err) {
     const message = String(err?.message ?? err);
     const code = /timed out|timeout/i.test(message) ? "timeout" : "parse_failed";
@@ -108,58 +240,52 @@ function isReuseableTab(id, url) {
 }
 
 /** Overview already shows weekly %; only hop to /usage when that copy is missing. */
-async function preferGrokUsagePage(tabId) {
-  const text = await evaluate(tabId, "document.body.innerText || ''");
+async function preferGrokUsagePage(tabId, deadline) {
+  const text = await evaluateWithin(tabId, "document.body.innerText || ''", deadline);
   if (/Weekly included usage|Weekly SuperGrok Limit/i.test(text)) return;
-  const url = SOURCES.x_premium.url;
-  await evaluate(tabId, `location.href=${JSON.stringify(url)}`, { awaitPromise: false }).catch(() => {});
-  await waitFor(tabId, "document.readyState === 'complete'", { timeoutMs: 15000 }).catch(() => {});
-  await waitFor(tabId, READY.x_premium(), { timeoutMs: 15000 }).catch(() => {});
+  await navigateTab(tabId, SOURCES.x_premium.url, deadline);
+  await waitFor(tabId, READY_CHECKS.x_premium(), { timeoutMs: budget(deadline, PAGE_LOAD_TIMEOUT_MS) }).catch(() => {});
 }
 
 /** /console redirects into a workspace; /console/<workspace>/go carries the explicit windows. */
-async function preferWorkspaceGoPage(tabId) {
-  const href = await evaluate(tabId, "location.href");
+async function preferWorkspaceGoPage(tabId, deadline) {
+  const href = await evaluateWithin(tabId, "location.href", deadline);
   const m = href.match(/^https:\/\/opencode\.ai\/console\/(wrk_[A-Za-z0-9]+)/);
   if (!m) return;
   if (/\/go(\/|$|\?)/.test(href)) return;
   const url = `https://opencode.ai/console/${m[1]}/go`;
-  await evaluate(tabId, `location.href=${JSON.stringify(url)}`, { awaitPromise: false }).catch(() => {});
-  await waitFor(tabId, "document.readyState === 'complete'", { timeoutMs: 15000 }).catch(() => {});
-  await waitFor(tabId, `document.body.innerText.includes('5-hour window')`, { timeoutMs: 15000 }).catch(() => {});
+  await navigateTab(tabId, url, deadline);
+  await waitFor(tabId, READY_CHECKS.opencode_go(), { timeoutMs: budget(deadline, PAGE_LOAD_TIMEOUT_MS) }).catch(() => {});
 }
 
 /**
- * Read-only diagnostic: open/navigate, read text, parse, report. No storage writes.
+ * Read-only diagnostic: reload/navigate, read text, parse, report. No storage writes.
  * Throws {code:'cdp_unavailable'} when the debug port is not reachable.
  */
 export async function probeSource(id, { keepTab = false, timeoutMs = 20000 } = {}) {
-  if (!PARSERS[id]) throw Object.assign(new Error(`${id} 没有自动适配器`), { code: "unsupported" });
+  const parse = parserFor(id);
+  if (!parse) throw Object.assign(new Error(`${id} 没有自动适配器`), { code: "unsupported" });
   const url = SOURCES[id].url;
+  const deadline = Date.now() + Math.max(1000, Number(timeoutMs) || 20000);
   try {
     await cdpVersion({ timeoutMs: 3000 });
   } catch {
     throw Object.assign(new Error("连不上 127.0.0.1:9333"), { code: "cdp_unavailable" });
   }
 
-  const pages = await listTargets();
-  const origin = new URL(url).origin;
-  let tab = pages.find((p) => p.url.startsWith(origin));
+  let tab = null;
   let created = false;
-  if (!tab) {
-    tab = await createTarget(url, { background: true });
-    created = true;
-  }
+  let fresh = false;
+  ({ tab, created, fresh } = await openFreshTab(id, { deadline }));
   try {
-    await waitFor(tab.id, "document.readyState === 'complete'", { timeoutMs: 15000 }).catch(() => {});
-    await waitFor(tab.id, READY[id](), { timeoutMs, intervalMs: 500 }).catch(() => {});
-    if (id === "opencode_go") await preferWorkspaceGoPage(tab.id);
-    if (id === "x_premium") await preferGrokUsagePage(tab.id);
-    await sleep(800);
-    const finalUrl = await evaluate(tab.id, "location.href");
-    const text = await evaluate(tab.id, "document.body.innerText || ''");
+    if (!fresh) throw Object.assign(new Error("控制台标签页重新加载后未拿到新文档"), { code: "timeout" });
+    await waitFor(tab.id, READY_CHECKS[id](), { timeoutMs: budget(deadline, 20000), intervalMs: 500 }).catch(() => {});
+    if (id === "opencode_go") await preferWorkspaceGoPage(tab.id, deadline);
+    if (id === "x_premium") await preferGrokUsagePage(tab.id, deadline);
+    const { text, parsed: settled } = await readSettled(tab.id, parse, deadline);
+    const finalUrl = await evaluateWithin(tab.id, "location.href", deadline).catch(() => "");
     const unreachable = classifyUnreachable(finalUrl, text);
-    const parsed = unreachable ? { ok: false, ...unreachable } : PARSERS[id](text, new Date());
+    const parsed = unreachable ? { ok: false, ...unreachable } : settled;
     return {
       source: SOURCES[id].id,
       url,

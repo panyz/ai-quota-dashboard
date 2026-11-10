@@ -19,7 +19,7 @@ function windowValue(remaining, total, unit = "次") {
 
 const OK_WINDOWS = {
   volcengine: {
-    windows: { h5: windowValue(80, 100), week: windowValue(30, 50), month: windowValue(400, 500) },
+    windows: { h5: windowValue(80, 100, "%"), week: windowValue(30, 100, "%"), month: windowValue(40, 100, "%") },
     mainWindow: "month",
   },
   opencode_go: {

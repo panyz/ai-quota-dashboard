@@ -40,7 +40,7 @@ const USAGE = `quota — 本地 AI 额度聚合 CLI（schema ${SCHEMA_VERSION}�
   quota sources [--json] [--set-default volcengine=week]
                                           内置源；写 state.meta.defaultWindow
   quota probe --source volcengine|opencode-go|x-premium [--json] [--out FILE]
-                                          只读诊断，不改数据
+                                          只读诊断（会 reload 标签页），不改数据
   quota clear --yes                       清空额度数据（别名 reset）
   quota doctor [--json]                   自检 dataDir/cdp/serverPort/schema
   quota serve [--port 8787]               本地看板（带访问 token）
@@ -358,6 +358,13 @@ async function cmdProbe(argv) {
       if (json) printJson({ ok: false, source: SOURCES[id].id, error: { code: "cdp_unavailable", message: "连不上 127.0.0.1:9333" } });
       else console.error(`调试端口未开：连不上 127.0.0.1:9333（用 --remote-debugging-port=9333 启动 Chrome）`);
       process.exitCode = EXIT.cdp;
+      return;
+    }
+    if (err.code === "timeout") {
+      const message = String(err.message ?? err);
+      if (json) printJson({ ok: false, source: SOURCES[id].id, error: { code: "timeout", message } });
+      else console.error(`读取超时：${message}`);
+      process.exitCode = EXIT.timeout;
       return;
     }
     throw err;

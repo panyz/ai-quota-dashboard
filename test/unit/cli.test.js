@@ -47,7 +47,7 @@ test("fetch with mock only creates state.json (no config), exit 0", () => {
   assert.equal(r.code, 0, r.stderr);
   assert.equal(existsSync(join(dir, "config.json")), false);
   const s = readState(dir);
-  assert.equal(s.sources.volcengine.windows.month.remaining, 400);
+  assert.equal(s.sources.volcengine.windows.month.remaining, 40);
 });
 
 test("list --json empty state: schemaVersion=current, three null windows, meta defaults", () => {
@@ -55,7 +55,7 @@ test("list --json empty state: schemaVersion=current, three null windows, meta d
   const r = run(["list", "--json"], { QUOTA_DATA_DIR: dir });
   assert.equal(r.code, 0, r.stderr);
   const d = json(r.stdout);
-  assert.equal(d.schemaVersion, 2);
+  assert.equal(d.schemaVersion, 3);
   assert.deepEqual(Object.keys(d.sources).sort(), ["opencode_go", "volcengine", "x_premium"]);
   assert.deepEqual(Object.keys(d.sources.volcengine.windows), ["h5", "week", "month"]);
   assert.equal(d.sources.volcengine.status, "never");
@@ -174,7 +174,7 @@ test("partial windows: h5 updates, week/month kept, missingWindows reported, exi
   const s = readState(dir).sources.volcengine;
   assert.equal(s.windows.h5.remaining, 30);
   assert.equal(s.windows.week.remaining, 30);
-  assert.equal(s.windows.month.remaining, 400);
+  assert.equal(s.windows.month.remaining, 40);
 });
 
 test("CDP down: fetch 3; doctor 3 with hints and no config check", () => {
@@ -216,7 +216,7 @@ test("doctor: busy server port is warn, not fail", async () => {
 test("schemaVersion+1: show/fetch/set exit 8 and never rewrite the file (BUG-21)", () => {
   const dir = tmp();
   const doc = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     sources: {},
     meta: { lastFetchAt: null, defaultWindow: { volcengine: "auto", opencode_go: "h5", x_premium: "h5" } },
   };
@@ -233,6 +233,34 @@ test("schemaVersion+1: show/fetch/set exit 8 and never rewrite the file (BUG-21)
     assert.match(r.stderr, /数据版本较新/);
     assert.deepEqual(bytes(dir), before, `${args.join(" ")} must not touch the file`);
   }
+});
+
+test("schemaVersion 2 migrates on read and keeps the numbers", () => {
+  const dir = tmp();
+  const updatedAt = "2026-11-05T11:00:00.000Z";
+  writeFileSync(
+    join(dir, "state.json"),
+    JSON.stringify({
+      schemaVersion: 2,
+      sources: {
+        volcengine: {
+          status: "ok",
+          mode: "auto",
+          windows: {
+            h5: { remaining: 98.88, total: 100, unit: "%", resetAt: null, updatedAt, window: "h5" },
+          },
+        },
+      },
+      meta: { lastFetchAt: updatedAt, defaultWindow: { volcengine: "auto", opencode_go: "h5", x_premium: "week" } },
+    }),
+  );
+  const r = run(["list", "--json"], { QUOTA_DATA_DIR: dir });
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(json(r.stdout).sources.volcengine.windows.h5.remaining, 98.88);
+  const stored = readState(dir);
+  assert.equal(stored.schemaVersion, 3);
+  assert.equal(stored.sources.volcengine.windows.h5.remaining, 98.88);
+  assert.equal(stored.meta.migratedFrom, 2);
 });
 
 test("older schemaVersion is refused with exit 8, not migrated", () => {
@@ -293,7 +321,7 @@ test("unknown flag / command / --version", () => {
 
   const v = run(["--version"], { QUOTA_DATA_DIR: dir });
   assert.equal(v.code, 0);
-  assert.equal(v.stdout.trim(), "2");
+  assert.equal(v.stdout.trim(), "3");
 });
 
 test("fetch --source x-premium is an auto source", () => {

@@ -1,7 +1,7 @@
-import { SOURCE_IDS, WINDOW_KEYS, SCHEMA_VERSION, advertisedWindows, deriveWindowStatus, wasNotReadThisAttempt } from "./model.js";
+import { SOURCE_IDS, SOURCES, SCHEMA_VERSION, advertisedWindows, deriveWindowStatus, wasNotReadThisAttempt } from "./model.js";
 
 /**
- * Output shape for one source (AC-10). Windows are always the fixed three keys.
+ * Output shape for one source. Window order comes from that source's spec.
  * @param {string} id
  * @param {any} source
  * @param {any} state
@@ -9,16 +9,16 @@ import { SOURCE_IDS, WINDOW_KEYS, SCHEMA_VERSION, advertisedWindows, deriveWindo
  */
 export function buildSourceView(id, source, state, now) {
   const windows = {};
-  for (const key of WINDOW_KEYS) {
-    const w = source.windows[key];
-    windows[key] = w
+  for (const spec of SOURCES[id].windows) {
+    const w = source.windows[spec.key];
+    windows[spec.key] = w
       ? {
           remaining: w.remaining,
           total: w.total,
           unit: w.unit,
           resetAt: w.resetAt,
           updatedAt: w.updatedAt,
-          status: deriveWindowStatus(w, now),
+          status: deriveWindowStatus(w, now, spec),
           notReadThisAttempt: wasNotReadThisAttempt(source, w),
         }
       : null;

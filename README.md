@@ -59,6 +59,8 @@ plugin_manager action=install_bundle target=/绝对路径/ai-quota-dashboard-for
 装好后输入框上方会出现「AI 额度」条，点一下在它上方浮出明细（Esc、点浮层外面、点关闭按钮、或再点一次额度条都能收起）。点击刷新会在后台跑一次真实读取（`POST /ai-quota/refresh` → 202），界面轮询 `/ai-quota/state` 直到完成；没装 Chrome 调试端口时会显示「浏览器未连接」而不是卡住。
 
 - 插件与 CLI 共用 `~/.ai-quota-dashboard/state.json`，不额外落盘、不上传；
+- 刷新是真实读取：会先把对应来源已打开的控制台标签页重新加载一次再读（只读，不点击、不输入、不读凭据）。这些控制台只在页面加载时拉取一次用量快照，长期挂着的标签页只会读到旧数字，所以每次都 reload 才能拿到当前值（`quota probe` 也一样）；
+- 浏览器页面本身的刷新不会触发读取，只有条上的刷新按钮 / `quota fetch` 才会；
 - `install_bundle` 对已安装的包会报 `already-installed`；改了 `client.js` 后可以先 `remove_bundle` 再装，或直接重启 Harness（`pnpm run dev:web` 运行时才走 HMR）；
 - 卸载：`plugin_manager action=remove_bundle target=ai-quota-dashboard`；只想临时关掉的话，先 `list_plugins` 查到该插件的 `entryId`，再 `set_plugin` 置 `enabled=false`（bundle 名和 entryId 不是一回事）。
 
@@ -80,7 +82,7 @@ quota --version
 - `--timeout` 是整条命令的总预算，不是每源各算。
 - `set` 只允许 `x-premium`（解析失败时的手动覆盖），窗口固定 `h5|week|month`，一次只写一个窗口。
 - `sources --set-default` 写入 `state.meta.defaultWindow`，不生成配置文件。
-- `probe` 只读诊断：不写 `state.json`、不触发抓取。
+- `probe` 只读诊断：会像刷新一样重新加载已打开的控制台标签页再读，但不写 `state.json`。
 - `serve` 生成一次性 token，只绑 `127.0.0.1`；打开页面会自动「刷新额度」（POST），「重新读取」仅 GET。Grok 卡片只显示周窗口。
 
 ## 数据与隐私
@@ -89,7 +91,7 @@ quota --version
 - 只保存额度数值、重置时间、时间戳、默认窗口；**不保存** Cookie、Token、密码、页面 HTML、账号 ID。
 - 读取方式：通过 CDP 读取已登录标签页的 `document.body.innerText`；不使用 Cookie/Network/Storage 导出能力。
 - 本地网页只监听回环地址；无外部请求、无 CDN、无遥测。
-- `quota --version` 打印当前数据格式版本（`schemaVersion`）。数据文件版本必须完全相等；更新或更旧都退出 8，不迁移、不写入。恢复：`quota clear --yes` 后重新抓取或录入。
+- `quota --version` 打印当前数据格式版本（`schemaVersion`，当前为 3）。版本 2 的数据文件在读取时自动升级，额度数字保留；比 2 更旧、或比当前更新的版本退出 8，不写入。恢复：`quota clear --yes` 后重新抓取或录入。
 
 ## 退出码
 
@@ -113,6 +115,7 @@ quota --version
 | `cdp_unavailable` | 浏览器没开 9333：`quota doctor`，用 `--remote-debugging-port=9333` 重启 |
 | `not_logged_in` | 在该 profile 登录对应控制台，再 `quota fetch` |
 | `parse_failed` | `quota probe --source <src> --json` 看报告，必要时用 `--out` 保存 |
+| 刷新后数字不变 | 刷新会 reload 对应控制台标签页再读；若仍不变，先用 `quota probe --source <src> --json` 确认页面本身已更新（平台可能延迟），再看标签页里显示的用量是否真的变了 |
 | 数据损坏 / 版本不符 | `quota clear --yes` |
 | 端口占用 | `quota serve --port 8788` |
 

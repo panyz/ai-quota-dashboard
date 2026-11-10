@@ -47,7 +47,8 @@ export function readState() {
   const doc = readJson(path, "数据文件");
   if (doc === null) return { state: emptyState(), path };
   try {
-    const { state } = normalizeState(doc);
+    const { state, migrated } = normalizeState(doc);
+    if (migrated) writeState(state);
     return { state, path };
   } catch (err) {
     throw Object.assign(err, { path });
@@ -73,7 +74,8 @@ function writeJsonAtomic(path, value, label) {
 }
 
 export function writeState(state) {
-  writeJsonAtomic(statePath(), { ...state, schemaVersion: SCHEMA_VERSION }, "数据文件");
+  const { state: clean } = normalizeState({ ...state, schemaVersion: SCHEMA_VERSION });
+  writeJsonAtomic(statePath(), clean, "数据文件");
   return statePath();
 }
 

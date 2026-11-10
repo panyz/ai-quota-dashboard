@@ -34,11 +34,11 @@ async function fetchWithTimeout(url, ms) {
   }
 }
 
-export async function createTarget(url, { background = true } = {}) {
+export async function createTarget(url, { background = true, timeoutMs = 20000 } = {}) {
   // /json/new is disabled in some builds (HTTP 405); go through the browser socket.
   const { webSocketDebuggerUrl } = await cdpVersion();
   const targetId = await withSocket(webSocketDebuggerUrl, async (send) => {
-    const out = await send("Target.createTarget", { url, background });
+    const out = await send("Target.createTarget", { url, background }, timeoutMs);
     return out.targetId;
   });
   if (!background) await bringToFront(targetId).catch(() => {});
@@ -48,6 +48,11 @@ export async function createTarget(url, { background = true } = {}) {
 export async function closeTarget(id) {
   const res = await fetchWithTimeout(`${cdpBase()}/json/close/${id}`, 5000);
   return res.ok;
+}
+
+/** Reload a page target so the next read sees a fresh document, not a stale DOM snapshot. */
+export async function reloadTarget(id, { timeoutMs = 10000 } = {}) {
+  return withSession(id, (send) => send("Page.reload", { ignoreCache: false }, timeoutMs), { timeoutMs });
 }
 
 export async function bringToFront(id) {
@@ -60,12 +65,12 @@ export async function bringToFront(id) {
   });
 }
 
-export async function evaluate(id, expression, { awaitPromise = true, timeoutMs = 10000 } = {}) {
+export async function evaluate(id, expression, { awaitPromise = true, timeoutMs = 10000, sendTimeoutMs } = {}) {
   return withSession(id, async (send) => {
     const out = await send(
       "Runtime.evaluate",
       { expression, awaitPromise, returnByValue: true, timeout: timeoutMs },
-      timeoutMs + 2000
+      Math.max(300, Number(sendTimeoutMs) || timeoutMs + 2000)
     );
     if (out.exceptionDetails) {
       const d = out.exceptionDetails;
@@ -80,8 +85,13 @@ export async function waitFor(id, expression, { timeoutMs = 15000, intervalMs = 
   const deadline = Date.now() + timeoutMs;
   let last;
   while (Date.now() < deadline) {
+    const remaining = Math.max(200, Math.min(3000, deadline - Date.now()));
     try {
-      last = await evaluate(id, expression, { awaitPromise: false, timeoutMs: 3000 });
+      last = await evaluate(id, expression, {
+        awaitPromise: false,
+        timeoutMs: remaining,
+        sendTimeoutMs: remaining + 300,
+      });
       if (last) return last;
     } catch (err) {
       last = String(err.message || err);
