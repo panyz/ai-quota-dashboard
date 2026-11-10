@@ -18,6 +18,7 @@ export const MANIFESTS = [
     id: "volcengine",
     slug: "volcengine",
     name: "火山引擎 Coding Plan",
+    shortName: "火山",
     url: "https://console.volcengine.com/ark/region:cn-beijing/subscription/coding-plan",
     transport: "cdp",
     aliases: ["volc"],
@@ -32,6 +33,7 @@ export const MANIFESTS = [
     })()`,
     },
     parser: { kind: "module", name: "volcengine", version: "volc-v2" },
+    navigate: { reuseIncludes: ["/subscription/coding-plan", "/openManagement"] },
     windows: [
       percent("h5", "5 小时", 5 * HOUR),
       percent("week", "周", 7 * DAY),
@@ -42,6 +44,7 @@ export const MANIFESTS = [
     id: "opencode_go",
     slug: "opencode-go",
     name: "OpenCode Go",
+    shortName: "OC",
     url: "https://opencode.ai/console",
     transport: "cdp",
     aliases: ["opencode-go", "opencode"],
@@ -55,6 +58,13 @@ export const MANIFESTS = [
     })()`,
     },
     parser: { kind: "module", name: "opencode_go", version: "opencode-v1" },
+    navigate: {
+      workspaceGo: {
+        pattern: "^https://opencode\\.ai/console/(wrk_[A-Za-z0-9]+)",
+        skip: "/go(?:/|$|\\?)",
+        url: "https://opencode.ai/console/{1}/go",
+      },
+    },
     windows: [
       percent("h5", "5 小时", 5 * HOUR),
       percent("week", "周", 7 * DAY),
@@ -65,6 +75,7 @@ export const MANIFESTS = [
     id: "x_premium",
     slug: "x-premium",
     name: "X Premium · Grok",
+    shortName: "Grok",
     url: "https://grok.com/dashboard/usage",
     transport: "cdp",
     aliases: ["x-premium", "x"],
@@ -78,6 +89,10 @@ export const MANIFESTS = [
     })()`,
     },
     parser: { kind: "module", name: "x_premium", version: "grok-v1" },
+    navigate: {
+      reusePattern: "^https://grok\\.com/dashboard(/|\\?|$)",
+      openWhenMissing: "Weekly included usage|Weekly SuperGrok Limit",
+    },
     windows: [
       percent("h5", "5 小时", 5 * HOUR, false),
       percent("week", "周", 7 * DAY),

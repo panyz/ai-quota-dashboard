@@ -1,4 +1,5 @@
 import { SOURCES, registry } from "../model.js";
+import { pageAlreadyShowsQuota, tabIsReusable, workspaceGoUrl } from "../navigate.js";
 import { parserFor } from "../parsers/index.js";
 import {
   cdpVersion,
@@ -124,7 +125,7 @@ async function openFreshTab(id, { deadline }) {
   }
 
   const startedAt = Date.now();
-  if (isReuseableTab(id, tab.url) || tab.url.startsWith(url.split("?")[0])) {
+  if (tabIsReusable(registry.get(id)?.navigate, tab.url) || tab.url.startsWith(url.split("?")[0])) {
     await reloadTarget(tab.id, { timeoutMs: budget(deadline, RELOAD_TIMEOUT_MS) }).catch(async () => {
       await evaluateWithin(tab.id, "location.reload()", deadline, { awaitPromise: false }).catch(() => {});
     });
@@ -204,8 +205,7 @@ export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}
       };
     }
     await waitFor(tab.id, READY_CHECKS[id](), { timeoutMs: budget(deadline, 20000), intervalMs: 500 }).catch(() => {});
-    if (id === "opencode_go") await preferWorkspaceGoPage(tab.id, deadline);
-    if (id === "x_premium") await preferGrokUsagePage(tab.id, deadline);
+    await followNavigate(id, tab.id, deadline);
     // A read needs at least the settle budget; don't start one that cannot finish.
     if (left(deadline) < 1000) {
       return { ok: false, code: "timeout", message: "命令总超时预算已用尽" };
@@ -225,37 +225,25 @@ export async function readSource(id, { timeoutMs = 30000, keepTab = false } = {}
   }
 }
 
-/** The volcengine console has two quota entry points; both are acceptable. */
-function isVolcPlanPage(id, url) {
-  if (id !== "volcengine") return false;
-  return url.includes("/subscription/coding-plan") || url.includes("/openManagement");
-}
-
-function isGrokDash(id, url) {
-  return id === "x_premium" && /^https:\/\/grok\.com\/dashboard(\/|\?|$)/.test(url);
-}
-
-function isReuseableTab(id, url) {
-  return isVolcPlanPage(id, url) || isGrokDash(id, url);
-}
-
-/** Overview already shows weekly %; only hop to /usage when that copy is missing. */
-async function preferGrokUsagePage(tabId, deadline) {
-  const text = await evaluateWithin(tabId, "document.body.innerText || ''", deadline);
-  if (/Weekly included usage|Weekly SuperGrok Limit/i.test(text)) return;
-  await navigateTab(tabId, SOURCES.x_premium.url, deadline);
-  await waitFor(tabId, READY_CHECKS.x_premium(), { timeoutMs: budget(deadline, PAGE_LOAD_TIMEOUT_MS) }).catch(() => {});
-}
-
-/** /console redirects into a workspace; /console/<workspace>/go carries the explicit windows. */
-async function preferWorkspaceGoPage(tabId, deadline) {
-  const href = await evaluateWithin(tabId, "location.href", deadline);
-  const m = href.match(/^https:\/\/opencode\.ai\/console\/(wrk_[A-Za-z0-9]+)/);
-  if (!m) return;
-  if (/\/go(\/|$|\?)/.test(href)) return;
-  const url = `https://opencode.ai/console/${m[1]}/go`;
-  await navigateTab(tabId, url, deadline);
-  await waitFor(tabId, READY_CHECKS.opencode_go(), { timeoutMs: budget(deadline, PAGE_LOAD_TIMEOUT_MS) }).catch(() => {});
+/** Apply the manifest's navigate rules: workspace hop, or open the quota URL when the copy is missing. */
+async function followNavigate(id, tabId, deadline) {
+  const navigate = registry.get(id)?.navigate;
+  if (!navigate) return;
+  const ready = READY_CHECKS[id];
+  if (navigate.workspaceGo) {
+    const href = await evaluateWithin(tabId, "location.href", deadline);
+    const next = workspaceGoUrl(navigate, href);
+    if (!next) return;
+    await navigateTab(tabId, next, deadline);
+    if (ready) await waitFor(tabId, ready(), { timeoutMs: budget(deadline, PAGE_LOAD_TIMEOUT_MS) }).catch(() => {});
+    return;
+  }
+  if (navigate.openWhenMissing) {
+    const text = await evaluateWithin(tabId, "document.body.innerText || ''", deadline);
+    if (pageAlreadyShowsQuota(navigate, text)) return;
+    await navigateTab(tabId, SOURCES[id].url, deadline);
+    if (ready) await waitFor(tabId, ready(), { timeoutMs: budget(deadline, PAGE_LOAD_TIMEOUT_MS) }).catch(() => {});
+  }
 }
 
 /**
@@ -280,8 +268,7 @@ export async function probeSource(id, { keepTab = false, timeoutMs = 20000 } = {
   try {
     if (!fresh) throw Object.assign(new Error("控制台标签页重新加载后未拿到新文档"), { code: "timeout" });
     await waitFor(tab.id, READY_CHECKS[id](), { timeoutMs: budget(deadline, 20000), intervalMs: 500 }).catch(() => {});
-    if (id === "opencode_go") await preferWorkspaceGoPage(tab.id, deadline);
-    if (id === "x_premium") await preferGrokUsagePage(tab.id, deadline);
+    await followNavigate(id, tab.id, deadline);
     const { text, parsed: settled } = await readSettled(tab.id, parse, deadline);
     const finalUrl = await evaluateWithin(tab.id, "location.href", deadline).catch(() => "");
     const unreachable = classifyUnreachable(finalUrl, text);

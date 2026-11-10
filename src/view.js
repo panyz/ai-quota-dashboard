@@ -23,12 +23,16 @@ export function buildSourceView(id, source, state, now) {
         }
       : null;
   }
+  const meta = SOURCES[id];
   return {
+    name: meta.name,
+    shortName: meta.shortName,
     mode: source.mode,
     status: source.status,
     defaultWindow: state?.meta?.defaultWindow?.[id] ?? "auto",
     mainWindow: source.mainWindow,
     reportedWindows: [...advertisedWindows(id)],
+    windowLabels: Object.fromEntries(meta.windows.map((spec) => [spec.key, spec.label])),
     error: source.error,
     lastAttemptAt: source.lastAttemptAt,
     adapterVersion: source.adapterVersion,

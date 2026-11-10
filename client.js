@@ -22,8 +22,6 @@ window.__ModuleLoader__.load({
     const REQUEST_TIMEOUT_MS = 8000;
     const POLL_INTERVAL_MS = 1500;
     const POLL_BUDGET_MS = 90000;
-    const WINDOW_KEYS = ['h5', 'week', 'month'];
-    const SOURCE_IDS = ['volcengine', 'opencode_go', 'x_premium'];
     const STATUS_KEYS = [
       'never',
       'ok',
@@ -489,11 +487,22 @@ window.__ModuleLoader__.load({
       return fmtAmount(win.remaining, win.unit);
     }
 
+    function sourceIds(sources) {
+      return sources ? Object.keys(sources) : [];
+    }
+
+    function windowKeys(source) {
+      if (source && Array.isArray(source.reportedWindows) && source.reportedWindows.length) return source.reportedWindows;
+      return source && source.windows ? Object.keys(source.windows) : [];
+    }
+
     function primaryWindow(source) {
       if (!source || !source.windows) return null;
-      const preferred = source.mainWindow || source.defaultWindow;
+      const preferred = source.mainWindow && source.mainWindow !== 'auto' ? source.mainWindow : null;
       if (preferred && source.windows[preferred]) return source.windows[preferred];
-      for (const key of WINDOW_KEYS) {
+      const configured = source.defaultWindow && source.defaultWindow !== 'auto' ? source.defaultWindow : null;
+      if (configured && source.windows[configured]) return source.windows[configured];
+      for (const key of windowKeys(source)) {
         if (source.windows[key]) return source.windows[key];
       }
       return null;
@@ -536,15 +545,30 @@ window.__ModuleLoader__.load({
       return tr(STATUS_KEYS.includes(status) ? 'status.' + status : 'status.unknown');
     }
 
-    function windowLabel(key) {
-      return tr('window.' + key);
+    function windowLabel(key, source) {
+      const labels = source && source.windowLabels;
+      if (labels && typeof labels[key] === 'string' && labels[key]) return labels[key];
+      const translated = tr('window.' + key);
+      return translated === 'window.' + key ? key : translated;
+    }
+
+    function sourceName(id, source) {
+      if (source && source.name) return source.name;
+      return tr('source.' + id);
+    }
+
+    function sourceShort(id, source) {
+      if (source && source.shortName) return source.shortName;
+      const translated = tr('source.' + id + '.short');
+      return translated === 'source.' + id + '.short' ? sourceName(id, source) : translated;
     }
 
     function chipTitle(id, source) {
-      const name = tr('source.' + id);
+      const name = sourceName(id, source);
       const win = primaryWindow(source);
       if (!win) return name + ' · ' + tr('dock.never');
-      const parts = [name, windowLabel(source.mainWindow || source.defaultWindow || 'h5'), windowValue(win)];
+      const key = windowKeys(source).find((item) => source.windows && source.windows[item] === win) || source.mainWindow;
+      const parts = [name, windowLabel(key, source), windowValue(win)];
       if (win.resetAt) parts.push(countdownText(win.resetAt));
       return parts.join(' · ');
     }
@@ -558,7 +582,7 @@ window.__ModuleLoader__.load({
 
     function lastUpdated(sources) {
       let newest = 0;
-      for (const id of SOURCE_IDS) {
+      for (const id of sourceIds(sources)) {
         const source = sources && sources[id];
         const at = source && source.lastAttemptAt ? new Date(source.lastAttemptAt).getTime() : NaN;
         if (Number.isFinite(at) && at > newest) newest = at;
@@ -704,12 +728,12 @@ window.__ModuleLoader__.load({
         'span',
         { key: id, className: 'aqd-chip aqd-chip--' + tone, title: chipTitle(id, source) },
         h('span', { className: 'aqd-dot' }),
-        h('span', { className: 'aqd-chip-name' }, tr('source.' + id + '.short')),
+        h('span', { className: 'aqd-chip-name' }, sourceShort(id, source)),
         h('span', { className: 'aqd-chip-value' }, chipValue(source)),
       );
     }
 
-    function renderWindow(key, win) {
+    function renderWindow(key, win, source) {
       const badge = windowBadge(win);
       const classes = ['aqd-win'];
       if (badge) classes.push('aqd-win--' + badge);
@@ -717,7 +741,7 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { key, className: classes.join(' ') },
-        h('span', { className: 'aqd-win-k' }, windowLabel(key)),
+        h('span', { className: 'aqd-win-k' }, windowLabel(key, source)),
         h('span', { className: 'aqd-win-v' }, windowValue(win)),
         win && win.resetAt ? h('span', { className: 'aqd-win-reset' }, countdownText(win.resetAt)) : null,
       );
@@ -731,14 +755,14 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'aqd-src-head' },
-          h('span', { className: 'aqd-src-name' }, tr('source.' + id)),
+          h('span', { className: 'aqd-src-name' }, sourceName(id, source)),
           h('span', { className: 'aqd-src-status aqd-src-status--' + statusTone(status) }, statusLabel(status)),
         ),
         source
           ? h(
               'div',
               { className: 'aqd-wins' },
-              WINDOW_KEYS.map((key) => renderWindow(key, source.windows ? source.windows[key] : null)),
+              windowKeys(source).map((key) => renderWindow(key, source.windows ? source.windows[key] : null, source)),
             )
           : null,
         source && source.error
@@ -859,7 +883,7 @@ window.__ModuleLoader__.load({
             h('span', { className: 'aqd-title' }, tr('dock.label')),
             !state.loaded ? h('span', { className: 'aqd-muted' }, tr('dock.loading')) : null,
             state.loaded && !sources ? h('span', { className: 'aqd-muted' }, tr('dock.never')) : null,
-            sources ? h('span', { className: 'aqd-chips' }, SOURCE_IDS.map((id) => renderChip(id, sources[id]))) : null,
+            sources ? h('span', { className: 'aqd-chips' }, sourceIds(sources).map((id) => renderChip(id, sources[id]))) : null,
           ),
           h(
             'button',
@@ -1017,7 +1041,7 @@ window.__ModuleLoader__.load({
           state.error ? h('div', { className: 'aqd-error' }, errorText(state.error)) : null,
           !state.loaded ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.loading')) : null,
           state.loaded && !sources ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.details.empty')) : null,
-          sources ? SOURCE_IDS.map((id) => renderSource(id, sources[id])) : null,
+          sources ? sourceIds(sources).map((id) => renderSource(id, sources[id])) : null,
         ),
         h(
           'div',

@@ -5,9 +5,9 @@ import {
   SCHEMA_VERSION,
   SOURCE_IDS,
   SOURCES,
-  WINDOW_KEYS,
   advertisedWindows,
   resolveSource,
+  windowOrder,
   deriveWindowStatus,
 } from "./model.js";
 import { readState, ensureState, clearState, dataDir, statePath, ensureDir, clearStaleLock } from "./store.js";
@@ -94,8 +94,9 @@ function parseArgs(argv, spec) {
 const now = () => new Date();
 const printJson = (obj) => process.stdout.write(JSON.stringify(obj, null, 2) + "\n");
 
-function windowLine(key, w, source, defaultWindow, current) {
-  if (!w) return `  ${windowLabel(key).padEnd(5)} 未提供`;
+function windowLine(id, key, w, source, defaultWindow, current) {
+  const label = SOURCES[id].windows.find((spec) => spec.key === key)?.label ?? windowLabel(key);
+  if (!w) return `  ${label.padEnd(5)} 未提供`;
   const parts = [`剩余 ${fmtRemaining(w)}`];
   const total = fmtTotal(w);
   if (total) parts.push(`总量 ${total}`);
@@ -111,7 +112,7 @@ function windowLine(key, w, source, defaultWindow, current) {
   parts.push(fmtReset(w, current));
   const updated = fmtRelative(w.updatedAt, current);
   if (updated) parts.push(`更新 ${updated}`);
-  return `  ${windowLabel(key).padEnd(5)} ${parts.join(" · ")}`;
+  return `  ${label.padEnd(5)} ${parts.join(" · ")}`;
 }
 
 function printSource(id, source, state) {
@@ -119,7 +120,7 @@ function printSource(id, source, state) {
   const explicit = state.meta.defaultWindow[id];
   const effective = explicit === "auto" ? source.mainWindow : explicit;
   const lines = [`${SOURCES[id].name}  [${sourceStatusText(source.status)}]  (${SOURCES[id].id})`];
-  for (const key of advertisedWindows(id)) lines.push(windowLine(key, source.windows[key], source, effective, current));
+  for (const key of advertisedWindows(id)) lines.push(windowLine(id, key, source.windows[key], source, effective, current));
   if (source.error?.message) lines.push(`  错误：${source.error.message}`);
   console.log(lines.join("\n"));
 }
@@ -209,7 +210,7 @@ async function cmdFetch(argv) {
   if (!rawSource || rawSource === "all") ids = autoSourceIds();
   else {
     const id = resolveSource(rawSource);
-    if (!id) throw new UsageError(`未知源：${rawSource}（可选 volcengine | opencode-go | x-premium | all）`);
+    if (!id) throw new UsageError(`未知源：${rawSource}（可选 ${SOURCE_IDS.map((key) => SOURCES[key].id).join(" | ")} | all）`);
     ids = [id];
   }
 
@@ -228,7 +229,8 @@ async function cmdFetch(argv) {
       console.log(`${SOURCES[id].name}  [${sourceStatusText(src.status)}]`);
       for (const key of advertisedWindows(id)) {
         const w = src.windows[key];
-        console.log(w ? `  ${windowLabel(key)}：剩余 ${fmtRemaining(w)}` : `  ${windowLabel(key)}：未提供`);
+        const label = SOURCES[id].windows.find((spec) => spec.key === key)?.label ?? windowLabel(key);
+        console.log(w ? `  ${label}：剩余 ${fmtRemaining(w)}` : `  ${label}：未提供`);
       }
       if (src.error?.message) console.log(`  错误：${src.error.message}`);
     }
@@ -263,7 +265,8 @@ async function cmdSet(argv) {
   if (id !== "x_premium") throw new UsageError("一期只允许手动写入 x-premium；自动源请用 quota fetch");
 
   const window = args[FLAGS].window;
-  if (!WINDOW_KEYS.includes(window)) throw new UsageError("--window 只能是 h5 | week | month");
+  const allowed = windowOrder(id);
+  if (!allowed.includes(window)) throw new UsageError(`--window 只能是 ${allowed.join(" | ")}`);
   const remaining = args[FLAGS].remaining;
   if (!Number.isFinite(remaining) || remaining < 0) throw new UsageError("--remaining 必填，且为 ≥0 的数字");
   const total = args[FLAGS].total;
@@ -313,8 +316,8 @@ async function cmdSources(argv) {
     const [rawSource, rawWindow] = raw.split("=");
     const id = resolveSource(rawSource);
     if (!id) throw new UsageError(`未知源：${rawSource}`);
-    if (rawWindow !== "auto" && !WINDOW_KEYS.includes(rawWindow)) {
-      throw new UsageError("默认窗口只能是 auto | h5 | week | month");
+    if (rawWindow !== "auto" && !windowOrder(id).includes(rawWindow)) {
+      throw new UsageError(`默认窗口只能是 auto | ${windowOrder(id).join(" | ")}`);
     }
     return setDefaultWindow(id, rawWindow, args[FLAGS].json);
   }

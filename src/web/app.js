@@ -88,7 +88,14 @@ function badgeOf(w) {
   return null;
 }
 function windowKeys(source) {
-  return Array.isArray(source.reportedWindows) && source.reportedWindows.length ? source.reportedWindows : WINDOW_KEYS;
+  if (Array.isArray(source.reportedWindows) && source.reportedWindows.length) return source.reportedWindows;
+  if (source.windows && typeof source.windows === "object") return Object.keys(source.windows);
+  return WINDOW_KEYS;
+}
+function labelOf(source, key) {
+  const labels = source.windowLabels;
+  if (labels && typeof labels[key] === "string" && labels[key]) return labels[key];
+  return WINDOW_LABEL[key] ?? key;
 }
 function defaultKey(source) {
   const keys = windowKeys(source);
@@ -98,8 +105,8 @@ function defaultKey(source) {
   return keys[0] ?? null;
 }
 
-function row(key, w, isDefault, partial) {
-  const label = WINDOW_LABEL[key] ?? key;
+function row(source, key, w, isDefault, partial) {
+  const label = labelOf(source, key);
   if (!w) {
     return `<div class="win empty"><span class="wlabel">${esc(label)}</span><span class="wvalue">未提供</span></div>`;
   }
@@ -128,7 +135,7 @@ function card(id, s) {
   else summary = `剩余 ${fmtAmount(w.remaining, w.unit)}`;
 
   const statusTag = s.status && s.status !== "ok" && s.status !== "manual" ? `<span class="tag warn">${esc(SOURCE_STATUS[s.status] ?? s.status)}</span>` : "";
-  const rows = windowKeys(s).map((k) => row(k, s.windows[k], k === eff, s.status === "partial")).join("");
+  const rows = windowKeys(s).map((k) => row(s, k, s.windows[k], k === eff, s.status === "partial")).join("");
   const err = s.error?.message
     ? `<div class="err">${esc(s.error.message)}<div class="hint">${esc(HINTS[s.error.code] ?? "")}</div></div>`
     : "";
@@ -137,13 +144,11 @@ function card(id, s) {
       <span class="name">${esc(s.name ?? id)}</span>
       <span class="tags"><span class="tag">${s.mode === "manual" ? "手动" : "自动"}</span>${statusTag}</span>
     </div>
-    <div class="summary${w ? "" : " empty"}">${esc(summary)}<small>${eff ? esc(WINDOW_LABEL[eff] ?? eff) : ""}</small></div>
+    <div class="summary${w ? "" : " empty"}">${esc(summary)}<small>${eff ? esc(labelOf(s, eff)) : ""}</small></div>
     <div class="windows">${rows}</div>
     ${err}
   </article>`;
 }
-
-const NAMES = { volcengine: "火山引擎 Coding Plan", opencode_go: "OpenCode Go", x_premium: "X Premium · Grok" };
 
 async function load() {
   if (!token) return;
@@ -154,8 +159,8 @@ async function load() {
     generated.textContent = "—";
     return;
   }
-  cards.innerHTML = ["volcengine", "opencode_go", "x_premium"]
-    .map((id) => card(id, { ...data.sources[id], name: NAMES[id] }))
+  cards.innerHTML = Object.keys(data.sources || {})
+    .map((id) => card(id, data.sources[id]))
     .join("");
   generated.textContent = `刷新于 ${new Date(data.generatedAt).toLocaleTimeString("zh-CN", { hour12: false })}`;
   jsonlink.href = `/api/state?token=${encodeURIComponent(token)}`;
