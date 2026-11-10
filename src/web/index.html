@@ -9,8 +9,7 @@
   <body data-datapath="{{DATA_PATH}}" data-port="{{PORT}}">
     <main class="wrap">
       <header class="top">
-        <h1>AI 额度看板</h1>
-        <span id="mode" class="pill">本地</span>
+        <h1>AI 额度看板 <span id="mode" class="pill">本地</span></h1>
         <div class="actions">
           <button id="reload" type="button" class="btn ghost">重新读取</button>
           <button id="refresh" type="button" class="btn">刷新额度</button>
@@ -18,7 +17,7 @@
         <span id="refreshState" class="muted" role="status" aria-live="polite"></span>
       </header>
       <p id="notice" class="notice" hidden></p>
-      <section id="cards" class="cards" aria-live="polite"></section>
+      <section id="cards" class="lines" aria-label="各来源额度" aria-live="polite"></section>
       <footer class="foot">
         <span id="generated">—</span>
         <span>· 数据 <code id="datapath"></code></span>

@@ -179,7 +179,25 @@ window.__ModuleLoader__.load({
 .aqd-title { flex: none; font-weight: 500; color: var(--dsw-alias-label-secondary); white-space: nowrap; }
 .aqd-muted { color: var(--dsw-alias-label-secondary); white-space: nowrap; }
 .aqd-chips { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
-.aqd-chip { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 108px; white-space: nowrap; }
+.aqd-chip { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 132px; white-space: nowrap; }
+.aqd-mini {
+  position: relative;
+  width: 28px;
+  height: 2px;
+  flex: none;
+  border-radius: 0;
+  background: var(--route, #141414);
+}
+.aqd-mini > i {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--at, 0) * (100% - 6px));
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--route, var(--dsw-alias-label-primary));
+  transform: translateY(-50%);
+}
 .aqd-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--dsw-alias-state-idle-primary); }
 .aqd-chip--ok .aqd-dot { background: var(--dsw-alias-state-success-primary); }
 .aqd-chip--low .aqd-dot { background: var(--dsw-alias-state-warn-primary); }
@@ -187,9 +205,9 @@ window.__ModuleLoader__.load({
 .aqd-chip--bad .aqd-dot { background: var(--dsw-alias-state-error-primary); }
 .aqd-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--dsw-alias-label-secondary); }
 .aqd-chip-value { flex: none; color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
-.aqd-chip--low .aqd-chip-value { color: var(--dsw-alias-state-warn-primary); }
+.aqd-chip--low .aqd-chip-value { color: #8a5a00; }
 .aqd-chip--used_up .aqd-chip-value,
-.aqd-chip--bad .aqd-chip-value { color: var(--dsw-alias-state-error-primary); }
+.aqd-chip--bad .aqd-chip-value { color: #c23b22; }
 .aqd-action {
   display: grid;
   place-items: center;
@@ -272,25 +290,27 @@ window.__ModuleLoader__.load({
   overflow-y: auto;
   padding: 2px 12px 4px;
 }
-.aqd-src { display: flex; flex-direction: column; gap: 6px; padding: 8px 4px; }
+.aqd-src { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 8px 4px; }
+.aqd-src-track { position: relative; height: 2px; margin: 14px 8px 18px; border-radius: 0; background: var(--route, #141414); }
+.aqd-src-track > i { position: absolute; top: 50%; left: calc(var(--at, 0) * (100% - 8px)); width: 8px; height: 8px; border-radius: 50%; background: var(--route, currentColor); transform: translateY(-50%); }
 .aqd-src + .aqd-src { border-top: 1px solid var(--dsw-alias-border-l1); }
 .aqd-src-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .aqd-src-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .aqd-src-status { flex: none; font-size: 11px; color: var(--dsw-alias-label-secondary); }
-.aqd-src-status--ok { color: var(--dsw-alias-state-success-primary); }
-.aqd-src-status--warn { color: var(--dsw-alias-state-warn-primary); }
-.aqd-src-status--bad { color: var(--dsw-alias-state-error-primary); }
-.aqd-wins { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.aqd-src-status--ok { color: inherit; }
+.aqd-src-status--warn { color: #8a5a00; }
+.aqd-src-status--bad { color: #c23b22; }
+.aqd-wins { position: relative; height: 16px; margin: 0 8px; }
 .aqd-win {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  position: absolute;
+  left: calc(var(--at, 0) * 100%);
+  top: 0;
+  transform: translateX(-50%);
   min-width: 0;
-  padding: 4px 6px;
-  border-radius: 6px;
-  background: var(--dsw-alias-bg-layer-2);
+  font-size: 11px;
+  white-space: nowrap;
 }
-.aqd-win-k { font-size: 11px; color: var(--dsw-alias-label-secondary); }
+.aqd-win-k { color: inherit; }
 .aqd-win-v {
   min-width: 0;
   overflow: hidden;
@@ -299,8 +319,8 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-label-primary);
   font-variant-numeric: tabular-nums;
 }
-.aqd-win--low .aqd-win-v { color: var(--dsw-alias-state-warn-primary); }
-.aqd-win--used_up .aqd-win-v { color: var(--dsw-alias-state-error-primary); }
+.aqd-win--low .aqd-win-v { color: #8a5a00; }
+.aqd-win--used_up .aqd-win-v { color: #c23b22; }
 .aqd-win--empty .aqd-win-v { color: var(--dsw-alias-state-idle-primary); }
 .aqd-win-reset {
   min-width: 0;
@@ -313,7 +333,7 @@ window.__ModuleLoader__.load({
 .aqd-src-error {
   overflow-wrap: anywhere;
   font-size: 11px;
-  color: var(--dsw-alias-state-error-primary);
+  color: #c23b22;
 }
 .aqd-pop-foot {
   display: flex;
@@ -329,7 +349,7 @@ window.__ModuleLoader__.load({
   overflow-wrap: anywhere;
   padding: 6px 4px;
   font-size: 11px;
-  color: var(--dsw-alias-state-error-primary);
+  color: #c23b22;
 }
 .aqd-pad { padding: 6px 4px; }
 .aqd-textbtn {
@@ -724,47 +744,71 @@ window.__ModuleLoader__.load({
       );
     }
 
+    const LINE = {
+      volcengine: '#c8102e',
+      opencode_go: '#1d4ed8',
+      x_premium: '#141414',
+      claude: '#c2410c',
+      zhipu: '#047857',
+      deepseek: '#6d28d9',
+      alibaba: '#0f766e',
+      codex: '#be185d',
+    };
+
+    function usedAt(win) {
+      if (!win || typeof win.remaining !== 'number' || !Number.isFinite(win.remaining)) return null;
+      if (win.unit === '%') return 1 - Math.min(1, Math.max(0, win.remaining / 100));
+      if (typeof win.total === 'number' && win.total > 0) return 1 - Math.min(1, Math.max(0, win.remaining / win.total));
+      return null;
+    }
+
     function renderChip(id, source) {
       const tone = sourceTone(source);
+      const at = usedAt(primaryWindow(source));
       return h(
         'span',
-        { key: id, className: 'aqd-chip aqd-chip--' + tone, title: chipTitle(id, source) },
-        h('span', { className: 'aqd-dot' }),
+        { key: id, className: 'aqd-chip aqd-chip--' + tone, title: chipTitle(id, source), style: { '--route': LINE[id] || '#141414' } },
+        h('span', { className: 'aqd-mini', 'aria-hidden': 'true' }, at === null ? null : h('i', { style: { '--at': String(at) } })),
         h('span', { className: 'aqd-chip-name' }, sourceShort(id, source)),
         h('span', { className: 'aqd-chip-value' }, chipValue(source)),
       );
     }
 
-    function renderWindow(key, win, source) {
+    function renderWindow(key, win, source, at) {
       const badge = windowBadge(win);
       const classes = ['aqd-win'];
       if (badge) classes.push('aqd-win--' + badge);
       if (!win) classes.push('aqd-win--empty');
       return h(
-        'div',
-        { key, className: classes.join(' ') },
-        h('span', { className: 'aqd-win-k' }, windowLabel(key, source)),
-        h('span', { className: 'aqd-win-v' }, windowValue(win)),
-        win && win.resetAt ? h('span', { className: 'aqd-win-reset' }, countdownText(win.resetAt)) : null,
+        'span',
+        { key, className: classes.join(' '), style: { '--at': String(at) } },
+        h('span', { className: 'aqd-win-k' }, windowLabel(key, source) + ' ' + windowValue(win)),
       );
     }
 
     function renderSource(id, source) {
       const status = source && typeof source.status === 'string' ? source.status : 'never';
+      const at = usedAt(primaryWindow(source));
       return h(
         'div',
-        { key: id, className: 'aqd-src' },
+        { key: id, className: 'aqd-src', style: { '--route': LINE[id] || '#141414' } },
         h(
           'div',
           { className: 'aqd-src-head' },
           h('span', { className: 'aqd-src-name' }, sourceName(id, source)),
           h('span', { className: 'aqd-src-status aqd-src-status--' + statusTone(status) }, statusLabel(status)),
         ),
+        h('span', { className: 'aqd-src-track', 'aria-hidden': 'true' }, at === null ? null : h('i', { style: { '--at': String(at) } })),
         source
           ? h(
               'div',
               { className: 'aqd-wins' },
-              windowKeys(source).map((key) => renderWindow(key, source.windows ? source.windows[key] : null, source)),
+              windowKeys(source).map((key, index, all) => {
+                const win = source.windows ? source.windows[key] : null;
+                const place = usedAt(win);
+                const at = place === null ? (all.length <= 1 ? 0 : index / (all.length - 1)) : place;
+                return renderWindow(key, win, source, at);
+              }),
             )
           : null,
         source && source.error

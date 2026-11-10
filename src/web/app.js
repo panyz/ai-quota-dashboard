@@ -105,47 +105,65 @@ function defaultKey(source) {
   return keys[0] ?? null;
 }
 
-function row(source, key, w, isDefault, partial) {
-  const label = labelOf(source, key);
-  if (!w) {
-    return `<div class="win empty"><span class="wlabel">${esc(label)}</span><span class="wvalue">未提供</span></div>`;
-  }
-  const badge = badgeOf(w);
-  const tags = [];
-  if (isDefault) tags.push('<span class="tag">默认</span>');
-  if (partial && w.notReadThisAttempt) tags.push('<span class="tag">本次未读取</span>');
-  if (w.status && w.status !== "ok") tags.push(`<span class="tag ${w.status === "expired" ? "muted" : "warn"}">${esc(WINDOW_STATUS[w.status] ?? w.status)}</span>`);
-  if (w.status === "reset_passed" || w.status === "expired") tags.push('<span class="tag muted">上次记录</span>');
-  if (badge) tags.push(`<span class="tag ${badge === "已用完" ? "danger" : "warn"}">${esc(badge)}</span>`);
+const LINE = {
+  volcengine: "#c8102e",
+  opencode_go: "#1d4ed8",
+  x_premium: "#141414",
+  claude: "#c2410c",
+  zhipu: "#047857",
+  deepseek: "#6d28d9",
+  alibaba: "#0f766e",
+  codex: "#be185d",
+};
 
-  const total = typeof w.total === "number" && w.total > 0 ? ` / 总量 ${fmtAmount(w.total, w.unit)}` : "";
-  const updated = rel(w.updatedAt);
-  return `<div class="win${w.status === "expired" || w.status === "reset_passed" ? " dim" : ""}">
-    <div class="whead"><span class="wlabel">${esc(label)}</span><span class="wvalue">剩余 ${esc(fmtAmount(w.remaining, w.unit))}${esc(total)}</span></div>
-    <div class="wmeta">${tags.join("")}<span class="muted">${esc(resetText(w))}${updated ? ` · 更新 ${esc(updated)}` : " · 更新时间未知"}</span></div>
-  </div>`;
+function usedAt(w) {
+  if (!w || typeof w.remaining !== "number" || !Number.isFinite(w.remaining)) return null;
+  if (w.unit === "%") return 1 - Math.min(1, Math.max(0, w.remaining / 100));
+  if (typeof w.total === "number" && w.total > 0) return 1 - Math.min(1, Math.max(0, w.remaining / w.total));
+  return null;
 }
 
 function card(id, s) {
+  const keys = windowKeys(s);
   const eff = defaultKey(s);
-  const w = eff ? s.windows[eff] : null;
-  let summary;
-  if (!eff) summary = "页面主数字未识别";
-  else if (!w) summary = "默认窗口未提供";
-  else summary = `剩余 ${fmtAmount(w.remaining, w.unit)}`;
-
-  const statusTag = s.status && s.status !== "ok" && s.status !== "manual" ? `<span class="tag warn">${esc(SOURCE_STATUS[s.status] ?? s.status)}</span>` : "";
-  const rows = windowKeys(s).map((k) => row(s, k, s.windows[k], k === eff, s.status === "partial")).join("");
+  const w = eff && s.windows ? s.windows[eff] : null;
+  const at = usedAt(w);
+  const badge = badgeOf(w);
+  const tone = badge === "已用完" ? " spent" : badge === "偏低" ? " low" : at === null ? " idle" : "";
+  const status = SOURCE_STATUS[s.status] ?? s.status ?? "未读取";
+  const statusClass = s.status && s.status !== "ok" && s.status !== "manual" && s.status !== "never" ? " bad" : "";
+  const stations = keys
+    .map((key, index) => {
+      const win = s.windows ? s.windows[key] : null;
+      const place = usedAt(win);
+      const at = place === null ? (keys.length <= 1 ? 0 : index / (keys.length - 1)) : place;
+      const value = win ? fmtAmount(win.remaining, win.unit) : "未提供";
+      return `<li class="station${key === eff ? " lead" : ""}" style="--at:${at.toFixed(4)}"><span>${esc(labelOf(s, key))}</span><span>${esc(value)}</span></li>`;
+    })
+    .join("");
+  const figure = w
+    ? `${esc(fmtAmount(w.remaining, w.unit))}<small>${esc(labelOf(s, eff))}${badge ? ` · ${esc(badge)}` : ""}</small>`
+    : eff ? "这条线还没有车" : "页面主数字未识别";
+  const reset = w ? `${resetText(w)}${rel(w.updatedAt) ? ` · 更新 ${rel(w.updatedAt)}` : ""}` : "还没有读到数字";
   const err = s.error?.message
-    ? `<div class="err">${esc(s.error.message)}<div class="hint">${esc(HINTS[s.error.code] ?? "")}</div></div>`
+    ? `<p class="err">${esc(s.error.message)}<span class="hint">${esc(HINTS[s.error.code] ?? "")}</span></p>`
     : "";
-  return `<article class="card${w ? "" : " dim"}">
-    <div class="card-head">
-      <span class="name">${esc(s.name ?? id)}</span>
-      <span class="tags"><span class="tag">${s.mode === "manual" ? "手动" : "自动"}</span>${statusTag}</span>
+  return `<article class="line${tone}" style="--route:${LINE[id] || "#141414"}">
+    <div class="line-id">
+      <span class="swatch" aria-hidden="true"></span>
+      <div>
+        <h2>${esc(s.name ?? id)}</h2>
+        <p class="line-status${statusClass}">${esc(status)}</p>
+      </div>
     </div>
-    <div class="summary${w ? "" : " empty"}">${esc(summary)}<small>${eff ? esc(labelOf(s, eff)) : ""}</small></div>
-    <div class="windows">${rows}</div>
+    <div class="route">
+      <div class="track">
+        ${at === null ? "" : `<span class="train" style="--at:${at.toFixed(4)}"></span>`}
+        <ol class="stations">${stations}</ol>
+      </div>
+    </div>
+    <p class="figure${w ? "" : " empty"}">${figure}</p>
+    <p class="detail">${esc(reset)}</p>
     ${err}
   </article>`;
 }
@@ -155,7 +173,7 @@ async function load() {
   const res = await fetch(`/api/state?token=${encodeURIComponent(token)}`, { cache: "no-store" });
   const data = await res.json();
   if (!res.ok) {
-    cards.innerHTML = `<article class="card"><div class="err">${esc(data.message || "读取失败")}<div class="hint">${esc(data.hint || "")}</div></div></article>`;
+    cards.innerHTML = `<article class="line idle" style="--route:#141414"><p class="err">${esc(data.message || "读取失败")}<span class="hint">${esc(data.hint || "")}</span></p></article>`;
     generated.textContent = "—";
     return;
   }
