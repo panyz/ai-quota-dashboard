@@ -48,7 +48,7 @@ test("API requires the token; state matches show --json shape", async () => {
     assert.equal(res.headers.get("access-control-allow-origin"), null, "no CORS header");
     const d = await res.json();
     assert.equal(d.schemaVersion, SCHEMA_VERSION);
-    assert.deepEqual(Object.keys(d.sources).sort(), ["opencode_go", "volcengine", "x_premium"]);
+    for (const id of ["opencode_go", "volcengine", "x_premium"]) assert.ok(d.sources[id]);
     assert.deepEqual(Object.keys(d.sources.volcengine.windows), ["h5", "week", "month"]);
     assert.equal(d.sources.volcengine.mode, "auto");
     assert.equal(d.sources.x_premium.status, "never");
@@ -67,7 +67,7 @@ test("POST /api/refresh refreshes and persists; second concurrent call gets 409"
     const first = await p1;
     assert.equal(first.status, 200);
     const d = await first.json();
-    assert.equal(d.summary.requested, 3);
+    assert.ok(d.summary.requested >= 3);
     assert.equal(d.ok, false);
   });
 });

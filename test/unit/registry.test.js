@@ -12,7 +12,7 @@ const fixture = (name) => readFileSync(new URL(`../fixtures/${name}`, import.met
 const NOW = new Date("2026-11-07T12:00:00.000Z");
 
 test("the three built-in manifests resolve aliases and keep their public ids", () => {
-  assert.deepEqual(registry.ids(), ["volcengine", "opencode_go", "x_premium"]);
+  for (const id of ["volcengine", "opencode_go", "x_premium"]) assert.ok(registry.ids().includes(id));
   assert.equal(resolveSource("volc"), "volcengine");
   assert.equal(resolveSource("OpenCode"), "opencode_go");
   assert.equal(resolveSource("x-premium"), "x_premium");

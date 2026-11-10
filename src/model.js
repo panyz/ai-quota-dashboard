@@ -84,6 +84,7 @@ export const SOURCE_STATUSES = Object.freeze([
   "page_unreachable",
   "timeout",
   "cdp_unavailable",
+  "config_error",
 ]);
 
 export const WINDOW_STATUSES = Object.freeze(["ok", "stale", "expired", "reset_passed"]);
@@ -98,6 +99,7 @@ export const SOURCE_STATUS_LABELS = Object.freeze({
   page_unreachable: "页面打不开",
   timeout: "读取超时",
   cdp_unavailable: "调试端口未开",
+  config_error: "缺少凭证",
 });
 
 export const WINDOW_STATUS_LABELS = Object.freeze({
@@ -349,7 +351,9 @@ export function deriveWindowStatus(w, now, spec) {
   const updated = Date.parse(w.updatedAt ?? "");
   if (!Number.isFinite(updated)) return "stale";
   const age = Math.max(0, now.getTime() - updated);
-  const period = spec?.periodMs ?? w.periodMs ?? DAY;
+  const declared = spec && Object.prototype.hasOwnProperty.call(spec, "periodMs") ? spec.periodMs : w.periodMs;
+  if (declared === null) return "ok";
+  const period = typeof declared === "number" ? declared : DAY;
   if (age > period * 3) return "expired";
   if (age > period) return "stale";
   return "ok";

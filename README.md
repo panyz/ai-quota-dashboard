@@ -8,7 +8,7 @@
 
 ## 功能
 
-- 三端聚合：火山引擎 Coding Plan、OpenCode Go、X Premium（Grok）
+- 聚合：火山引擎 Coding Plan、OpenCode Go、X Premium（Grok），以及 Claude、智谱 GLM、DeepSeek、阿里云百炼、OpenAI Codex
 - 每端固定 5 小时 / 周 / 月 三个窗口，各自显示剩余、总量、重置时间、更新时间
 - 缺失或未读到的窗口保留旧值并标注，不补 0、不猜值
 - 过期、未登录、调试端口不可用、页面改版都有明确状态与处理提示
@@ -26,7 +26,16 @@
   --user-data-dir="$HOME/.chrome-agent"
 ```
 
-- 在这个 profile 里**自行登录**要用到的控制台。本工具不处理登录、验证码或 2FA，也不接触凭据。
+- 在这个 profile 里**自行登录**要用到的控制台。本工具不处理登录、验证码或 2FA。
+- 接口类来源使用你自己的 key，或官方客户端已经写在本机的凭证。不会把凭证写入 `state.json`。
+
+| 来源 | 凭证 |
+|---|---|
+| Claude | `ANTHROPIC_OAUTH_TOKEN`，或 `~/.claude/.credentials.json` |
+| 智谱 | `Z_AI_API_KEY` 或 `BIGMODEL_API_KEY`；国内 host 用 `Z_AI_API_HOST=open.bigmodel.cn` |
+| DeepSeek | `DEEPSEEK_API_KEY` |
+| 阿里云百炼 | `ALIBABA_CODING_PLAN_API_KEY` 或 `DASHSCOPE_API_KEY` |
+| OpenAI Codex | `CODEX_ACCESS_TOKEN`，或 `~/.codex/auth.json` |
 
 ## 安装与运行
 

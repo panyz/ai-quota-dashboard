@@ -24,7 +24,10 @@ test("empty state: three fixed windows per source + meta.defaultWindow", () => {
   }
   assert.equal(s.sources.x_premium.status, "never");
   assert.equal(s.sources.volcengine.status, "never");
-  assert.deepEqual(s.meta.defaultWindow, { volcengine: "auto", opencode_go: "h5", x_premium: "week" });
+  assert.equal(s.meta.defaultWindow.volcengine, "auto");
+  assert.equal(s.meta.defaultWindow.opencode_go, "h5");
+  assert.equal(s.meta.defaultWindow.x_premium, "week");
+  assert.equal(s.meta.defaultWindow.deepseek, "balance");
   assert.equal(s.meta.lastFetchAt, null);
 });
 

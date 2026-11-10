@@ -32,6 +32,7 @@ window.__ModuleLoader__.load({
       'page_unreachable',
       'timeout',
       'cdp_unavailable',
+      'config_error',
     ];
 
     const ZH = {
@@ -63,6 +64,7 @@ window.__ModuleLoader__.load({
       'status.page_unreachable': '页面打不开',
       'status.timeout': '超时',
       'status.cdp_unavailable': '浏览器未连接',
+      'status.config_error': '缺少凭证',
       'status.unknown': '状态未知',
       'badge.low': '偏低',
       'badge.used_up': '已用尽',

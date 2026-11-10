@@ -54,8 +54,8 @@ export function validateManifest(m) {
     if (!SEMANTICS.includes(w.semantic)) {
       return fail("manifest_bad_semantic", `${m.id}/${w.key} semantic 必须是 ${SEMANTICS.join("|")}`);
     }
-    if (!(Number.isFinite(w.periodMs) && w.periodMs > 0)) {
-      return fail("manifest_bad_period", `${m.id}/${w.key} periodMs 必须是正数`);
+    if (w.periodMs !== null && !(Number.isFinite(w.periodMs) && w.periodMs > 0)) {
+      return fail("manifest_bad_period", `${m.id}/${w.key} periodMs 必须是正数或 null`);
     }
     if (typeof w.unit !== "string" || !w.unit) return fail("manifest_bad_unit", `${m.id}/${w.key} 缺少 unit`);
     if (w.semantic === "percent" && w.unit !== "%") {

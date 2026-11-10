@@ -14,6 +14,7 @@ import { readState, ensureState, clearState, dataDir, statePath, ensureDir, clea
 import { buildView } from "./view.js";
 import { performFetch, EXIT, autoSourceIds } from "./refresh.js";
 import { probeSource } from "./adapters/index.js";
+import { readApiSource } from "./api.js";
 import { cdpVersion } from "./cdp.js";
 import { UsageError, DataError } from "./errors.js";
 import {
@@ -31,7 +32,7 @@ import {
 const USAGE = `quota — 本地 AI 额度聚合 CLI（schema ${SCHEMA_VERSION}）
 
 用法:
-  quota fetch [--source volcengine|opencode-go|x-premium|all] [--timeout 秒] [--json]
+  quota fetch [--source <源>|all] [--timeout 秒] [--json]
                                           读取自动源（--timeout 是整条命令的总预算）
   quota list [source] [--json]            查看全部或单个源
   quota set x-premium --window h5|week|month --remaining N
@@ -346,16 +347,34 @@ async function setDefaultWindow(id, value, json) {
   console.log(`${SOURCES[id].name} 默认窗口已设为 ${value}`);
 }
 
+async function probeApi(id) {
+  const parsed = await readApiSource(id);
+  return {
+    source: SOURCES[id].id,
+    url: SOURCES[id].url,
+    finalUrl: SOURCES[id].url,
+    loggedIn: parsed.ok || parsed.code !== "config_error",
+    parserOk: Boolean(parsed.ok),
+    error: parsed.ok ? null : { code: parsed.code, message: parsed.message },
+    windowsFound: parsed.ok ? Object.keys(parsed.windows) : [],
+    mainWindow: parsed.ok ? parsed.mainWindow : null,
+    textLength: 0,
+  };
+}
+
 async function cmdProbe(argv) {
   const args = parseArgs(argv, { source: "string", json: "bool", out: "string", "keep-tab": "bool" });
   const raw = args[FLAGS].source ?? args._[0];
   const id = resolveSource(raw);
-  if (!id) throw new UsageError("请用 --source 指定源：volcengine | opencode-go | x-premium");
+  if (!id) throw new UsageError(`请用 --source 指定源：${SOURCE_IDS.map((key) => SOURCES[key].id).join(" | ")}`);
   const json = Boolean(args[FLAGS].json);
 
   let report;
   try {
-    report = await probeSource(id, { keepTab: Boolean(args[FLAGS]["keep-tab"]) });
+    report =
+      SOURCES[id].transport === "cdp"
+        ? await probeSource(id, { keepTab: Boolean(args[FLAGS]["keep-tab"]) })
+        : await probeApi(id);
   } catch (err) {
     if (err.code === "cdp_unavailable") {
       if (json) printJson({ ok: false, source: SOURCES[id].id, error: { code: "cdp_unavailable", message: "连不上 127.0.0.1:9333" } });

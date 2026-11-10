@@ -1,5 +1,6 @@
 import { SOURCE_IDS, SOURCES, advertisedWindows, resolveSource, windowOrder } from "./model.js";
 import { readSource } from "./adapters/index.js";
+import { readApiSource } from "./api.js";
 import { mockMode, mockRead } from "./mock.js";
 import { updateState, readState } from "./store.js";
 import { buildSourceView } from "./view.js";
@@ -57,7 +58,8 @@ export async function performFetch({ ids, timeoutSec = 30, keepTab = false, now 
     if (mode) {
       results[id] = await mockRead(id, { mode, budgetMs: remaining });
     } else {
-      results[id] = await cap(readSource(id, { timeoutMs: remaining, keepTab }), remaining);
+      const read = SOURCES[id].transport === "cdp" ? readSource(id, { timeoutMs: remaining, keepTab }) : readApiSource(id, { timeoutMs: remaining });
+      results[id] = await cap(read, remaining);
     }
   }
 

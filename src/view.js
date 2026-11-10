@@ -1,4 +1,4 @@
-import { SOURCE_IDS, SOURCES, SCHEMA_VERSION, advertisedWindows, deriveWindowStatus, wasNotReadThisAttempt } from "./model.js";
+import { SOURCE_IDS, SOURCES, SCHEMA_VERSION, deriveWindowStatus, wasNotReadThisAttempt } from "./model.js";
 
 /**
  * Output shape for one source. Window order comes from that source's spec.
@@ -31,7 +31,9 @@ export function buildSourceView(id, source, state, now) {
     status: source.status,
     defaultWindow: state?.meta?.defaultWindow?.[id] ?? "auto",
     mainWindow: source.mainWindow,
-    reportedWindows: [...advertisedWindows(id)],
+    reportedWindows: meta.windows
+      .filter((spec) => spec.advertised !== false || source.windows?.[spec.key])
+      .map((spec) => spec.key),
     windowLabels: Object.fromEntries(meta.windows.map((spec) => [spec.key, spec.label])),
     error: source.error,
     lastAttemptAt: source.lastAttemptAt,

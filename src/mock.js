@@ -30,6 +30,30 @@ const OK_WINDOWS = {
     windows: { week: windowValue(31, 100, "%") },
     mainWindow: "week",
   },
+  claude: {
+    windows: { h5: windowValue(70, 100, "%"), week: windowValue(40, 100, "%") },
+    mainWindow: "h5",
+  },
+  zhipu: {
+    windows: { h5: windowValue(800, 2000, "积分"), week: windowValue(5000, 10000, "积分") },
+    mainWindow: "h5",
+  },
+  deepseek: {
+    windows: { balance: { remaining: 12.5, total: null, unit: "¥", resetAt: null, updatedAt: null } },
+    mainWindow: "balance",
+  },
+  alibaba: {
+    windows: {
+      h5: windowValue(80, 100, "次"),
+      week: windowValue(300, 500, "次"),
+      month: windowValue(900, 2000, "次"),
+    },
+    mainWindow: "h5",
+  },
+  codex: {
+    windows: { h5: windowValue(75, 100, "%"), week: windowValue(60, 100, "%") },
+    mainWindow: "h5",
+  },
 };
 
 export function mockMode() {
