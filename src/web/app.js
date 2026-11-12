@@ -12,6 +12,7 @@ const SOURCE_STATUS = {
   timeout: "读取超时",
   cdp_unavailable: "调试端口未开",
   config_error: "配置错误",
+  auth_failed: "凭证被拒绝",
 };
 const HINTS = {
   cdp_unavailable: "用 --remote-debugging-port=9333 启动 Chrome，再点“刷新额度”。",
@@ -19,6 +20,7 @@ const HINTS = {
   parse_failed: "页面结构可能已变化：运行 quota probe <source> 抓文本，或先手动 quota set。",
   page_unreachable: "浏览器没打开该站点：确认同一浏览器里能手动打开，再点“刷新额度”。",
   timeout: "读取超时：检查页面是否加载完成，稍后重试。",
+  auth_failed: "接口拒绝了凭证：检查 AK/SK 是否完整、子用户是否挂载只读策略。",
   data_error: "数据文件不可用：运行 quota clear --yes 后重新录入。",
   partial: "部分窗口本次未读取，已保留上次数据。",
 };

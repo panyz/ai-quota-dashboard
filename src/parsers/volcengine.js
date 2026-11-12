@@ -11,6 +11,8 @@
 // "%" on the next line, so a bare 0/50/100 in that slot is a real value.
 // Anything unrecognised is parse_failed — never a guess.
 
+import { resetFrom } from "./api-window.js";
+
 const SIGNED_OUT = [/立即登录使用/, /^登录$/m];
 
 const WINDOWS = [
@@ -53,6 +55,76 @@ export function durationToMs(raw) {
 
 const RESET_TEXT = /([0-9]+\s*(?:天|小时|时|分钟|分|秒)(?:\s*[0-9]+\s*(?:天|小时|时|分钟|分|秒))*)\s*后重置/;
 const SCALE = new Set(["0", "50", "100"]);
+
+const round2Api = (n) => Math.round(n * 100) / 100;
+
+/** OpenAPI `Level` → this dashboard's window key. Only the three enforced windows are used. */
+const API_LEVEL = Object.freeze({
+  session: "h5",
+  "5h": "h5",
+  fivehour: "h5",
+  five_hour: "h5",
+  rolling_5h: "h5",
+  weekly: "week",
+  week: "week",
+  "7d": "week",
+  monthly: "month",
+  month: "month",
+});
+
+/** Window key for one `QuotaUsage` row, or null for a level this dashboard does not show. */
+function apiWindowKey(item) {
+  const level = String(item?.Level ?? item?.Type ?? item?.Period ?? item?.Label ?? item?.Window ?? "")
+    .trim()
+    .toLowerCase();
+  return API_LEVEL[level] ?? null;
+}
+
+/**
+ * Parse a GetCodingPlanUsage response. The OpenAPI reports PERCENT USED only
+ * (no absolute counts), with reset timestamps in unix seconds (or -1 when no
+ * reset is scheduled). Same conversion as the console parser: remaining =
+ * 100 - used.
+ * @param {any} payload
+ * @param {Date} now
+ */
+export function parseVolcengineApi(payload, now = new Date()) {
+  const result = payload && typeof payload === "object" && payload.Result && typeof payload.Result === "object"
+    ? payload.Result
+    : payload;
+  const list = result?.QuotaUsage;
+  if (!Array.isArray(list)) {
+    return { ok: false, code: "parse_failed", message: "火山方舟 OpenAPI 响应缺少 Result.QuotaUsage" };
+  }
+  const windows = {};
+  for (const item of list) {
+    const key = apiWindowKey(item);
+    if (!key || windows[key]) continue;
+    const percent = Number(item?.Percent ?? item?.UsedPercent ?? item?.UsagePercent);
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) continue;
+    const rawReset = item?.ResetTimestamp ?? item?.ResetTime;
+    windows[key] = {
+      remaining: round2Api(100 - percent),
+      total: 100,
+      unit: "%",
+      // Seconds as a JSON number normally; tolerate a numeric string from a proxy.
+      resetAt: typeof rawReset === "string" && /^\d+$/.test(rawReset.trim()) ? resetFrom(Number(rawReset)) : resetFrom(rawReset),
+    };
+  }
+  if (!Object.keys(windows).length) {
+    return {
+      ok: false,
+      code: "parse_failed",
+      message: "GetCodingPlanUsage 没有返回额度窗口：该账号可能没有生效的 Coding Plan 订阅",
+    };
+  }
+  return {
+    ok: true,
+    windows,
+    mainWindow: windows.h5 ? "h5" : windows.week ? "week" : "month",
+    adapterVersion: "volc-api-v1",
+  };
+}
 
 /**
  * Percentage used inside one window block. The value is a bare number with "%"
@@ -119,12 +191,16 @@ function readWindow(all, needles, now) {
 }
 
 /**
- * @param {string} text
+ * One parser for both transports: console text (CDP) or the OpenAPI JSON body
+ * (AK/SK). Dispatch on the value type keeps the manifest parser name stable.
+ * @param {string|object} value
  * @param {Date} now
  * @returns {{ok:true, windows:Record<string,any>, mainWindow:string|null, adapterVersion:string}
  *          | {ok:false, code:string, message:string}}
  */
-export function parseVolcengine(text, now = new Date()) {
+export function parseVolcengine(value, now = new Date()) {
+  if (value && typeof value === "object") return parseVolcengineApi(value, now);
+  const text = String(value ?? "");
   if (isSignedOut(text)) {
     return { ok: false, code: "not_logged_in", message: "火山方舟控制台未登录" };
   }

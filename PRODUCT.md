@@ -16,18 +16,19 @@ Aggregate the remaining quota of several AI subscriptions into one local view. S
 
 ## Positioning
 
-The numbers come from consoles the user has already signed into, or from credentials the official client already stored locally. A neighboring dashboard that asks for a password, uploads cookies, or hosts the login cannot make the same claim.
+The numbers come from consoles the user has already signed into, from credentials the official client already stored locally, or from an AccessKey pair the user configured for one read-only OpenAPI. A neighboring dashboard that asks for a password, uploads cookies, or hosts the login cannot make the same claim.
 
 ## Operating Context
 
-The tool runs on the user's Mac or Linux machine. Chrome with a dedicated profile and remote debugging port supplies the console reads. API-backed sources use an environment variable or a file the official client already wrote. The same state file feeds the local page (`quota serve`) and the Harness composer strip. Refresh is explicit: the page button, the strip button, or `quota fetch`.
+The tool runs on the user's Mac or Linux machine. Chrome with a dedicated profile and remote debugging port supplies the console reads. API-backed sources use an environment variable or a file the official client already wrote; Volcengine can instead use an AK/SK pair (environment, or `~/.ai-quota-dashboard/credentials.json`) to call its read-only OpenAPI without a browser session. The same state file feeds the local page (`quota serve`) and the Harness composer strip. Refresh is explicit: the page button, the strip button, or `quota fetch`.
 
 ## Capabilities and Constraints
 
 - Sources today: 火山引擎 Coding Plan, OpenCode Go, X Premium (Grok), Claude, 智谱 GLM Coding Plan, DeepSeek, 阿里云百炼 Coding Plan, OpenAI Codex.
 - Each source has its own windows (5-hour, week, month, points, or a balance with no reset). Missing windows stay empty. Failures keep the last good numbers.
 - Console reads reload the already-open tab and parse visible text. They do not click, type, or export cookies, tokens, or storage.
-- API reads use the user's own key or the official local credential file. Credentials are not written into `state.json`.
+- API reads use the user's own key or the official local credential file; Volcengine signs its OpenAPI request locally with the user's AK/SK. Credentials are not written into `state.json`.
+- Volcengine prefers the read-only OpenAPI when an AK/SK pair is present and falls back to the console read otherwise.
 - The local page binds to 127.0.0.1 and requires the one-time token printed at startup.
 - The Harness strip sits above the composer. Its detail layer is a popover anchored to the strip, not a modal.
 - Interface copy is Chinese, matching the CLI and the existing pages.

@@ -33,6 +33,7 @@ window.__ModuleLoader__.load({
       'timeout',
       'cdp_unavailable',
       'config_error',
+      'auth_failed',
     ];
 
     const ZH = {
@@ -65,6 +66,7 @@ window.__ModuleLoader__.load({
       'status.timeout': '超时',
       'status.cdp_unavailable': '浏览器未连接',
       'status.config_error': '缺少凭证',
+      'status.auth_failed': '凭证被拒绝',
       'status.unknown': '状态未知',
       'badge.low': '偏低',
       'badge.used_up': '已用尽',
@@ -113,6 +115,8 @@ window.__ModuleLoader__.load({
       'status.page_unreachable': 'Page unavailable',
       'status.timeout': 'Timed out',
       'status.cdp_unavailable': 'Browser unavailable',
+      'status.config_error': 'Missing credential',
+      'status.auth_failed': 'Credential rejected',
       'status.unknown': 'Unknown',
       'badge.low': 'Low',
       'badge.used_up': 'Used up',

@@ -29,10 +29,28 @@ export const MANIFESTS = [
     name: "火山引擎 Coding Plan",
     shortName: "火山",
     url: "https://console.volcengine.com/ark/region:cn-beijing/subscription/coding-plan",
-    transport: "cdp",
+    // API when an AK/SK pair resolves (no browser session needed); otherwise the
+    // already-signed-in console tab, exactly as before.
+    transport: "auto",
     aliases: ["volc"],
     workspace: null,
     defaultWindow: "auto",
+    auth: {
+      env: ["VOLC_ACCESS_KEY", "VOLCENGINE_ACCESS_KEY"],
+      secretEnv: ["VOLC_SECRET_KEY", "VOLCENGINE_SECRET_KEY"],
+      file: "~/.ai-quota-dashboard/credentials.json",
+      fields: ["VOLC_ACCESS_KEY", "accessKey"],
+      secretFields: ["VOLC_SECRET_KEY", "secretKey"],
+    },
+    api: {
+      method: "POST",
+      signing: "volcengine",
+      action: "GetCodingPlanUsage",
+      version: "2024-01-01",
+      service: "ark",
+      region: "cn-beijing",
+      url: "https://open.volcengineapi.com/",
+    },
     ready: {
       expr: `(() => {
       const t = document.body.innerText || '';

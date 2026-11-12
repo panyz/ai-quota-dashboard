@@ -1,6 +1,6 @@
 import { SOURCE_IDS, SOURCES, advertisedWindows, resolveSource, windowOrder } from "./model.js";
 import { readSource } from "./adapters/index.js";
-import { readApiSource } from "./api.js";
+import { readApiSource, usesApiTransport } from "./api.js";
 import { mockMode, mockRead } from "./mock.js";
 import { updateState, readState } from "./store.js";
 import { buildSourceView } from "./view.js";
@@ -21,6 +21,7 @@ export const EXIT = Object.freeze({
 const CODE_EXIT = {
   cdp_unavailable: EXIT.cdp,
   not_logged_in: EXIT.login,
+  auth_failed: EXIT.login,
   parse_failed: EXIT.parse,
   page_unreachable: EXIT.page,
   timeout: EXIT.timeout,
@@ -41,8 +42,9 @@ export function normalizeIds(ids) {
 /**
  * Fetch the requested sources under ONE total time budget (AC: --timeout is per command).
  * Failure keeps old windows; success merges only the windows that were read.
+ * `env` is exposed so tests can decide whether an "auto" source has its API key.
  */
-export async function performFetch({ ids, timeoutSec = 30, keepTab = false, now = new Date() }) {
+export async function performFetch({ ids, timeoutSec = 30, keepTab = false, now = new Date(), env = process.env }) {
   const requested = [...new Set(ids)].filter((id) => SOURCES[id]?.mode === "auto");
   const startedAt = now;
   const deadline = Date.now() + Math.max(1, Number(timeoutSec) || 30) * 1000;
@@ -58,7 +60,9 @@ export async function performFetch({ ids, timeoutSec = 30, keepTab = false, now 
     if (mode) {
       results[id] = await mockRead(id, { mode, budgetMs: remaining });
     } else {
-      const read = SOURCES[id].transport === "cdp" ? readSource(id, { timeoutMs: remaining, keepTab }) : readApiSource(id, { timeoutMs: remaining });
+      const read = usesApiTransport(id, env)
+        ? readApiSource(id, { timeoutMs: remaining, env })
+        : readSource(id, { timeoutMs: remaining, keepTab });
       results[id] = await cap(read, remaining);
     }
   }

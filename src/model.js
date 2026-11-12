@@ -100,6 +100,7 @@ export const SOURCE_STATUS_LABELS = Object.freeze({
   timeout: "读取超时",
   cdp_unavailable: "调试端口未开",
   config_error: "缺少凭证",
+  auth_failed: "凭证被拒绝",
 });
 
 export const WINDOW_STATUS_LABELS = Object.freeze({

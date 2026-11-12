@@ -6,6 +6,7 @@ import {
   SOURCE_IDS,
   SOURCES,
   advertisedWindows,
+  registry,
   resolveSource,
   windowOrder,
   deriveWindowStatus,
@@ -14,7 +15,7 @@ import { readState, ensureState, clearState, dataDir, statePath, ensureDir, clea
 import { buildView } from "./view.js";
 import { performFetch, EXIT, autoSourceIds } from "./refresh.js";
 import { probeSource } from "./adapters/index.js";
-import { readApiSource } from "./api.js";
+import { loadSecret, readApiSource, usesApiTransport } from "./api.js";
 import { cdpVersion } from "./cdp.js";
 import { UsageError, DataError } from "./errors.js";
 import {
@@ -50,7 +51,8 @@ const USAGE = `quota — 本地 AI 额度聚合 CLI（schema ${SCHEMA_VERSION}�
 退出码: 0 成功 / 1 全部失败且错误不同 / 2 参数 / 3 CDP 不可用 /
         4 未登录 / 5 解析失败 / 6 超时 / 7 部分成功 / 8 数据或端口错误
 环境:   QUOTA_DATA_DIR=~/.ai-quota-dashboard   QUOTA_TEST_MOCK（测试构建）
-        QUOTA_CDP（覆盖 CDP 地址，默认 http://127.0.0.1:9333）`;
+        QUOTA_CDP（覆盖 CDP 地址，默认 http://127.0.0.1:9333）
+        VOLC_ACCESS_KEY / VOLC_SECRET_KEY（火山方舟 OpenAPI，可选；不配则读控制台）`;
 
 export const FLAGS = Symbol("flags");
 
@@ -170,6 +172,16 @@ async function cmdDoctor(argv) {
       message: "连不上 127.0.0.1:9333；请用 --remote-debugging-port=9333 启动 Chrome",
     };
   }
+
+  const volcAuth = registry.get("volcengine")?.auth;
+  const volcSecret = loadSecret(volcAuth);
+  checks.volcengine =
+    volcSecret?.token && volcSecret.secret
+      ? { status: "ok", message: "AK/SK 已配置：火山方舟走 OpenAPI 直读，不需要控制台登录" }
+      : {
+          status: "warn",
+          message: "未配置 VOLC_ACCESS_KEY/VOLC_SECRET_KEY：火山方舟走控制台读取（需要 CDP 与登录）",
+        };
 
   const free = await isPortFree(8787);
   checks.serverPort = free
@@ -349,11 +361,12 @@ async function setDefaultWindow(id, value, json) {
 
 async function probeApi(id) {
   const parsed = await readApiSource(id);
+  const apiUrl = registry.get(id)?.api?.url ?? SOURCES[id].url;
   return {
     source: SOURCES[id].id,
-    url: SOURCES[id].url,
-    finalUrl: SOURCES[id].url,
-    loggedIn: parsed.ok || parsed.code !== "config_error",
+    url: apiUrl,
+    finalUrl: apiUrl,
+    loggedIn: parsed.ok || (parsed.code !== "config_error" && parsed.code !== "auth_failed"),
     parserOk: Boolean(parsed.ok),
     error: parsed.ok ? null : { code: parsed.code, message: parsed.message },
     windowsFound: parsed.ok ? Object.keys(parsed.windows) : [],
@@ -371,10 +384,9 @@ async function cmdProbe(argv) {
 
   let report;
   try {
-    report =
-      SOURCES[id].transport === "cdp"
-        ? await probeSource(id, { keepTab: Boolean(args[FLAGS]["keep-tab"]) })
-        : await probeApi(id);
+    report = usesApiTransport(id)
+      ? await probeApi(id)
+      : await probeSource(id, { keepTab: Boolean(args[FLAGS]["keep-tab"]) });
   } catch (err) {
     if (err.code === "cdp_unavailable") {
       if (json) printJson({ ok: false, source: SOURCES[id].id, error: { code: "cdp_unavailable", message: "连不上 127.0.0.1:9333" } });

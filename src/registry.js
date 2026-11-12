@@ -4,7 +4,7 @@
 export const HOUR = 3600 * 1000;
 export const DAY = 24 * HOUR;
 export const SEMANTICS = Object.freeze(["percent", "count", "credits"]);
-export const TRANSPORTS = Object.freeze(["cdp", "api", "manual"]);
+export const TRANSPORTS = Object.freeze(["cdp", "api", "auto", "manual"]);
 
 const ID_RE = /^[a-z][a-z0-9_]{1,31}$/;
 const SLUG_RE = /^[a-z][a-z0-9-]{1,31}$/;
@@ -33,8 +33,12 @@ export function validateManifest(m) {
   if (!Array.isArray(m.windows) || m.windows.length === 0) {
     return fail("manifest_no_windows", `${m.id} 至少声明一个窗口`);
   }
-  if (m.transport === "cdp" && (typeof m.ready?.expr !== "string" || !m.ready.expr.trim())) {
+  if ((m.transport === "cdp" || m.transport === "auto") && (typeof m.ready?.expr !== "string" || !m.ready.expr.trim())) {
     return fail("manifest_no_ready", `${m.id} 缺少 ready.expr`);
+  }
+  // "auto" picks the API when its credentials are present, so it must declare both.
+  if (m.transport === "auto" && (!m.api || !m.auth)) {
+    return fail("manifest_auto_incomplete", `${m.id} transport=auto 需要同时声明 api 与 auth`);
   }
   if (!m.parser || m.parser.kind !== "module" || !ID_RE.test(m.parser.name ?? "")) {
     return fail("manifest_bad_parser", `${m.id} parser 必须是 { kind:'module', name }`);

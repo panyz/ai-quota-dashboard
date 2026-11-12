@@ -8,8 +8,9 @@
  *   POST /ai-quota/refresh  → start a CDP read, answer 202 and poll for state
  *
  * The routes are registered on the Harness web server, so no separate server
- * or token is involved. Reads are read-only: the plugin never touches cookies,
- * tokens, or API keys.
+ * or token is involved. Reads are read-only: credentials stay on the host
+ * (environment or the user's local files), never reach the browser, and are
+ * not written into the state file.
  */
 import { ensureState, readState } from "./src/store.js";
 import { buildView } from "./src/view.js";

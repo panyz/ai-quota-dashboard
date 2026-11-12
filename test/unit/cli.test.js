@@ -183,15 +183,24 @@ test("CDP down: fetch 3; doctor 3 with hints and no config check", () => {
   assert.equal(r.code, 3);
   assert.equal(json(r.stdout).sources.volcengine.error.code, "cdp_unavailable");
 
-  const doc = run(["doctor", "--json"], { QUOTA_DATA_DIR: dir });
+  const doc = run(["doctor", "--json"], {
+    QUOTA_DATA_DIR: dir,
+    HOME: tmp(),
+    VOLC_ACCESS_KEY: "",
+    VOLC_SECRET_KEY: "",
+    VOLCENGINE_ACCESS_KEY: "",
+    VOLCENGINE_SECRET_KEY: "",
+  });
   assert.equal(doc.code, 3);
   const d = json(doc.stdout);
   assert.equal(d.ok, false);
-  assert.deepEqual(Object.keys(d.checks).sort(), ["cdp", "dataDir", "schema", "serverPort"]);
+  assert.deepEqual(Object.keys(d.checks).sort(), ["cdp", "dataDir", "schema", "serverPort", "volcengine"]);
   assert.equal(d.checks.cdp.status, "fail");
   assert.match(d.checks.cdp.message, /127\.0\.0\.1:9333/);
   assert.match(d.checks.cdp.message, /--remote-debugging-port=9333/);
   assert.equal(d.checks.schema.status, "ok");
+  assert.equal(d.checks.volcengine.status, "warn");
+  assert.match(d.checks.volcengine.message, /VOLC_ACCESS_KEY/);
 });
 
 test("doctor: busy server port is warn, not fail", async () => {
