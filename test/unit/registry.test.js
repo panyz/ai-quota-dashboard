@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registry, resolveSource, SOURCES, advertisedWindows } from "../../src/model.js";
 import { parserFor } from "../../src/parsers/index.js";
-import { parseVolcengine } from "../../src/parsers/volcengine.js";
 import { parseOpenCode } from "../../src/parsers/opencode.js";
 import { parseGrok } from "../../src/parsers/grok.js";
 import { ProviderRegistry, validateManifest } from "../../src/registry.js";
@@ -11,9 +10,9 @@ import { ProviderRegistry, validateManifest } from "../../src/registry.js";
 const fixture = (name) => readFileSync(new URL(`../fixtures/${name}`, import.meta.url), "utf8");
 const NOW = new Date("2026-11-07T12:00:00.000Z");
 
-test("the three built-in manifests resolve aliases and keep their public ids", () => {
-  for (const id of ["volcengine", "opencode_go", "x_premium"]) assert.ok(registry.ids().includes(id));
-  assert.equal(resolveSource("volc"), "volcengine");
+test("built-in manifests resolve aliases and keep their public ids", () => {
+  for (const id of ["opencode_go", "x_premium", "alibaba"]) assert.ok(registry.ids().includes(id));
+  assert.equal(resolveSource("bailian"), "alibaba");
   assert.equal(resolveSource("OpenCode"), "opencode_go");
   assert.equal(resolveSource("x-premium"), "x_premium");
   assert.equal(resolveSource("nope"), null);
@@ -21,12 +20,11 @@ test("the three built-in manifests resolve aliases and keep their public ids", (
   assert.equal(SOURCES.opencode_go.workspace, "auto");
   assert.equal(SOURCES.x_premium.url, "https://grok.com/dashboard/usage");
   assert.deepEqual(advertisedWindows("x_premium"), ["week"]);
-  assert.deepEqual(advertisedWindows("volcengine"), ["h5", "week", "month"]);
+  assert.deepEqual(advertisedWindows("alibaba"), ["h5", "week", "month"]);
 });
 
 test("manifest parsers match the existing parser functions on real fixtures", () => {
   const cases = [
-    ["volcengine", "volc-subscribe.txt", parseVolcengine],
     ["opencode_go", "opencode-go-page.txt", parseOpenCode],
     ["x_premium", "grok-dashboard-usage.txt", parseGrok],
   ];

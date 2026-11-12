@@ -4,12 +4,12 @@ import { pageAlreadyShowsQuota, tabIsReusable, workspaceGoUrl } from "../../src/
 import { registry } from "../../src/model.js";
 
 test("reuse rules come from the manifest, not a provider id branch", () => {
-  const volc = registry.get("volcengine").navigate;
   const grok = registry.get("x_premium").navigate;
-  assert.equal(tabIsReusable(volc, "https://console.volcengine.com/ark/region:cn-beijing/openManagement"), true);
-  assert.equal(tabIsReusable(volc, "https://console.volcengine.com/home"), false);
   assert.equal(tabIsReusable(grok, "https://grok.com/dashboard"), true);
   assert.equal(tabIsReusable(grok, "https://grok.com/"), false);
+  const includes = { reuseIncludes: ["/console/usage"] };
+  assert.equal(tabIsReusable(includes, "https://example.com/console/usage?tab=plan"), true);
+  assert.equal(tabIsReusable(includes, "https://example.com/home"), false);
 });
 
 test("opencode workspace pages hop to /go and stay there once arrived", () => {

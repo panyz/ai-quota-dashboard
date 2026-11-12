@@ -48,13 +48,13 @@ test("API requires the token; state matches show --json shape", async () => {
     assert.equal(res.headers.get("access-control-allow-origin"), null, "no CORS header");
     const d = await res.json();
     assert.equal(d.schemaVersion, SCHEMA_VERSION);
-    for (const id of ["opencode_go", "volcengine", "x_premium"]) assert.ok(d.sources[id]);
-    assert.deepEqual(Object.keys(d.sources.volcengine.windows), ["h5", "week", "month"]);
-    assert.equal(d.sources.volcengine.mode, "auto");
+    for (const id of ["opencode_go", "alibaba", "x_premium"]) assert.ok(d.sources[id]);
+    assert.deepEqual(Object.keys(d.sources.alibaba.windows), ["h5", "week", "month"]);
+    assert.equal(d.sources.alibaba.mode, "auto");
     assert.equal(d.sources.x_premium.status, "never");
     assert.equal(d.sources.x_premium.mode, "auto");
     assert.deepEqual(d.sources.x_premium.reportedWindows, ["week"]);
-    assert.deepEqual(d.sources.volcengine.reportedWindows, ["h5", "week", "month"]);
+    assert.deepEqual(d.sources.alibaba.reportedWindows, ["h5", "week", "month"]);
   });
 });
 

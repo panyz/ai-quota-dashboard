@@ -7,11 +7,9 @@ import { parseCodex } from "./codex.js";
 import { parseDeepseek } from "./deepseek.js";
 import { parseGrok } from "./grok.js";
 import { parseOpenCode } from "./opencode.js";
-import { parseVolcengine } from "./volcengine.js";
 import { parseZhipu } from "./zhipu.js";
 
 const PARSERS = Object.freeze({
-  volcengine: parseVolcengine,
   opencode_go: parseOpenCode,
   x_premium: parseGrok,
   claude: parseClaude,

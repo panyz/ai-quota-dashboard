@@ -18,13 +18,13 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 test("empty state: three fixed windows per source + meta.defaultWindow", () => {
   const s = emptyState();
   assert.equal(s.schemaVersion, SCHEMA_VERSION);
-  for (const id of ["volcengine", "opencode_go", "x_premium"]) {
+  for (const id of ["alibaba", "opencode_go", "x_premium"]) {
     assert.deepEqual(Object.keys(s.sources[id].windows), WINDOW_KEYS);
     for (const k of WINDOW_KEYS) assert.equal(s.sources[id].windows[k], null);
   }
   assert.equal(s.sources.x_premium.status, "never");
-  assert.equal(s.sources.volcengine.status, "never");
-  assert.equal(s.meta.defaultWindow.volcengine, "auto");
+  assert.equal(s.sources.alibaba.status, "never");
+  assert.equal(s.meta.defaultWindow.alibaba, "h5");
   assert.equal(s.meta.defaultWindow.opencode_go, "h5");
   assert.equal(s.meta.defaultWindow.x_premium, "week");
   assert.equal(s.meta.defaultWindow.deepseek, "balance");
@@ -40,13 +40,13 @@ test("per-window status: ok / stale / expired / reset_passed", () => {
 
 test("windows are independent: freshness follows each window's own period", () => {
   const doc = emptyState();
-  doc.sources.volcengine.windows.h5 = w({ updatedAt: "2026-11-05T06:00:00.000Z" });
-  doc.sources.volcengine.windows.week = w({ updatedAt: "2026-11-04T11:00:00.000Z" });
-  doc.sources.volcengine.windows.month = w({ updatedAt: "2026-07-01T12:00:00.000Z" });
+  doc.sources.alibaba.windows.h5 = w({ updatedAt: "2026-11-05T06:00:00.000Z" });
+  doc.sources.alibaba.windows.week = w({ updatedAt: "2026-11-04T11:00:00.000Z" });
+  doc.sources.alibaba.windows.month = w({ updatedAt: "2026-07-01T12:00:00.000Z" });
   const { state } = normalizeState(clone(doc));
-  assert.equal(deriveWindowStatus(state.sources.volcengine.windows.h5, NOW), "stale");
-  assert.equal(deriveWindowStatus(state.sources.volcengine.windows.week, NOW), "ok");
-  assert.equal(deriveWindowStatus(state.sources.volcengine.windows.month, NOW), "expired");
+  assert.equal(deriveWindowStatus(state.sources.alibaba.windows.h5, NOW), "stale");
+  assert.equal(deriveWindowStatus(state.sources.alibaba.windows.week, NOW), "ok");
+  assert.equal(deriveWindowStatus(state.sources.alibaba.windows.month, NOW), "expired");
 });
 
 test("normalizeWindow refuses empty unit, negative remaining, bad total, and percent above 100", () => {
@@ -79,33 +79,34 @@ test("auto source keeps a stored ok status", () => {
 
 test("effective default window comes from meta.defaultWindow", () => {
   const state = emptyState();
-  state.sources.volcengine.windows = { h5: w(), week: w(), month: w() };
-  state.sources.volcengine.mainWindow = "month";
-  assert.deepEqual(effectiveDefault("volcengine", state.sources.volcengine, state), { window: "month", reason: "main" });
+  state.sources.alibaba.windows = { h5: w(), week: w(), month: w() };
+  state.sources.alibaba.mainWindow = "month";
+  state.meta.defaultWindow.alibaba = "auto";
+  assert.deepEqual(effectiveDefault("alibaba", state.sources.alibaba, state), { window: "month", reason: "main" });
 
-  state.meta.defaultWindow.volcengine = "week";
-  assert.deepEqual(effectiveDefault("volcengine", state.sources.volcengine, state), { window: "week", reason: "config" });
+  state.meta.defaultWindow.alibaba = "week";
+  assert.deepEqual(effectiveDefault("alibaba", state.sources.alibaba, state), { window: "week", reason: "config" });
 
-  state.meta.defaultWindow.volcengine = "month";
-  assert.deepEqual(effectiveDefault("volcengine", state.sources.volcengine, state), { window: "month", reason: "config" });
+  state.meta.defaultWindow.alibaba = "month";
+  assert.deepEqual(effectiveDefault("alibaba", state.sources.alibaba, state), { window: "month", reason: "config" });
 });
 
 test("effective default: auto + mainWindow picks it; auto + null reports main-missing", () => {
   const state = emptyState();
-  state.sources.volcengine.windows = { h5: w(), week: w(), month: w() };
-  state.meta.defaultWindow.volcengine = "auto";
-  assert.deepEqual(effectiveDefault("volcengine", state.sources.volcengine, state), {
+  state.sources.alibaba.windows = { h5: w(), week: w(), month: w() };
+  state.meta.defaultWindow.alibaba = "auto";
+  assert.deepEqual(effectiveDefault("alibaba", state.sources.alibaba, state), {
     window: null,
     reason: "main-missing",
   });
-  state.sources.volcengine.mainWindow = "month";
-  assert.deepEqual(effectiveDefault("volcengine", state.sources.volcengine, state), { window: "month", reason: "main" });
+  state.sources.alibaba.mainWindow = "month";
+  assert.deepEqual(effectiveDefault("alibaba", state.sources.alibaba, state), { window: "month", reason: "main" });
 });
 
 test("effective default: explicit window missing means window-missing", () => {
   const state = emptyState();
-  state.meta.defaultWindow.volcengine = "week";
-  assert.deepEqual(effectiveDefault("volcengine", state.sources.volcengine, state), {
+  state.meta.defaultWindow.alibaba = "week";
+  assert.deepEqual(effectiveDefault("alibaba", state.sources.alibaba, state), {
     window: "week",
     reason: "window-missing",
   });
@@ -130,7 +131,7 @@ test("v2 state migrates and keeps declared windows, undeclared windows move to l
   const doc = {
     schemaVersion: 2,
     sources: {
-      volcengine: {
+      alibaba: {
         status: "ok",
         windows: {
           h5: { remaining: 98.88, total: 100, unit: "%", resetAt: null, updatedAt, window: "h5" },
@@ -138,15 +139,15 @@ test("v2 state migrates and keeps declared windows, undeclared windows move to l
         },
       },
     },
-    meta: { lastFetchAt: updatedAt, defaultWindow: { volcengine: "week" } },
+    meta: { lastFetchAt: updatedAt, defaultWindow: { alibaba: "week" } },
   };
   const { state, migrated } = normalizeState(doc, NOW);
   assert.equal(migrated, true);
   assert.equal(state.schemaVersion, 3);
-  assert.equal(state.sources.volcengine.windows.h5.remaining, 98.88);
-  assert.equal(state.sources.volcengine.windows.week, null);
-  assert.equal(state.sources.volcengine.legacyWindows.day.remaining, 3);
-  assert.equal(state.meta.defaultWindow.volcengine, "week");
+  assert.equal(state.sources.alibaba.windows.h5.remaining, 98.88);
+  assert.equal(state.sources.alibaba.windows.week, null);
+  assert.equal(state.sources.alibaba.legacyWindows.day.remaining, 3);
+  assert.equal(state.meta.defaultWindow.alibaba, "week");
   assert.equal(state.meta.lastFetchAt, updatedAt);
   assert.equal(state.meta.migratedFrom, 2);
 });
@@ -168,7 +169,7 @@ test("corrupt documents are refused", () => {
 });
 
 test("source aliases used by the CLI", () => {
-  assert.equal(resolveSource("volcengine"), "volcengine");
+  assert.equal(resolveSource("bailian"), "alibaba");
   assert.equal(resolveSource("opencode-go"), "opencode_go");
   assert.equal(resolveSource("x-premium"), "x_premium");
   assert.equal(resolveSource("nope"), null);

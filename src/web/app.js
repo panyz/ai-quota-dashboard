@@ -108,7 +108,6 @@ function defaultKey(source) {
 }
 
 const LINE = {
-  volcengine: "#c8102e",
   opencode_go: "#1d4ed8",
   x_premium: "#141414",
   claude: "#c2410c",

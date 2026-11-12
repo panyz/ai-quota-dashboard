@@ -4,11 +4,11 @@
 
 只读：不读取或导出浏览器的 Cookie、登录态；接口类来源只使用你自己配置的 key，凭证不会写进 `state.json`，也不会上传。
 
-> **非官方工具，与火山引擎、OpenCode、X 无关联。** 它依赖控制台页面结构和你自己的登录态；平台改版会失效，自动化访问也可能受各平台服务条款限制。请自行判断是否使用，风险自负。
+> **非官方工具，与 OpenCode、X 及各模型厂商无关联。** 它依赖控制台页面结构和你自己的登录态；平台改版会失效，自动化访问也可能受各平台服务条款限制。请自行判断是否使用，风险自负。
 
 ## 功能
 
-- 聚合：火山引擎 Coding Plan、OpenCode Go、X Premium（Grok），以及 Claude、智谱 GLM、DeepSeek、阿里云百炼、OpenAI Codex
+- 聚合：OpenCode Go、X Premium（Grok）、Claude、智谱 GLM、DeepSeek、阿里云百炼、OpenAI Codex
 - 每端固定 5 小时 / 周 / 月 三个窗口，各自显示剩余、总量、重置时间、更新时间
 - 缺失或未读到的窗口保留旧值并标注，不补 0、不猜值
 - 过期、未登录、调试端口不可用、页面改版都有明确状态与处理提示
@@ -36,25 +36,6 @@
 | DeepSeek | `DEEPSEEK_API_KEY` |
 | 阿里云百炼 | `ALIBABA_CODING_PLAN_API_KEY` 或 `DASHSCOPE_API_KEY` |
 | OpenAI Codex | `CODEX_ACCESS_TOKEN`，或 `~/.codex/auth.json` |
-
-### 火山引擎：AK/SK 直读（不依赖浏览器登录）
-
-火山方舟 Coding Plan 的额度有只读 OpenAPI（`GetCodingPlanUsage`）。配置一对 AK/SK 后，这个来源直接调 `open.volcengineapi.com`，不需要 Chrome 调试端口，也不需要控制台登录：
-
-1. 在[访问控制 → 访问密钥](https://console.volcengine.com/iam/keymanage)新建一对 AK/SK（建议单独建子用户，不要用主账号密钥）；
-2. 给这个子用户挂 `ArkReadOnlyAccess` 只读策略（`GetCodingPlanUsage` 是只读动作）；
-3. 写入凭证，二选一：
-   - 环境变量 `VOLC_ACCESS_KEY` / `VOLC_SECRET_KEY`：CLI 立即生效；DSH 插件需要重启 `dsh web`（环境变量在进程启动时读取）；
-   - `~/.ai-quota-dashboard/credentials.json`（权限 `0600`）：
-     ```json
-     { "VOLC_ACCESS_KEY": "AKLT…", "VOLC_SECRET_KEY": "……" }
-     ```
-     文件在每次刷新时读取，改完不用重启；
-4. 验证：`quota doctor` 会显示「AK/SK 已配置」，`quota probe --source volcengine` 会直接打 OpenAPI。
-
-环境变量优先于文件。AK/SK 都在时才走 OpenAPI；只配了一半或都没配时，仍然走原来的控制台读取（需要 CDP 与登录）。接口拒绝凭证时状态是 `auth_failed`，消息会点名是 SecretKey 不匹配、子用户缺策略，还是没有生效的订阅。
-
-DSH 插件：host 半部在 `dsh web` 启动时加载，所以升级到这个版本后需要重启一次 `dsh web`；之后改 `credentials.json` 不用再重启。
 
 ## 安装与运行
 
@@ -95,11 +76,11 @@ plugin_manager action=install_bundle target=/绝对路径/ai-quota-dashboard-for
 ## 命令
 
 ```bash
-quota fetch [--source volcengine|opencode-go|x-premium|all] [--timeout 秒] [--json]
+quota fetch [--source opencode-go|x-premium|all] [--timeout 秒] [--json]
 quota list [source] [--json]
 quota set x-premium --window week --remaining 31 --total 100 --unit % [--reset-at ISO] [--json]
-quota sources [--json] [--set-default volcengine=week]
-quota probe --source volcengine|opencode-go|x-premium [--json] [--out FILE]
+quota sources [--json] [--set-default opencode-go=week]
+quota probe --source opencode-go|x-premium [--json] [--out FILE]
 quota clear --yes            # 别名 reset
 quota doctor [--json]
 quota serve [--port 8787]
@@ -110,15 +91,14 @@ quota --version
 - `--timeout` 是整条命令的总预算，不是每源各算。
 - `set` 只允许 `x-premium`（解析失败时的手动覆盖），窗口固定 `h5|week|month`，一次只写一个窗口。
 - `sources --set-default` 写入 `state.meta.defaultWindow`，不生成配置文件。
-- `probe` 只读诊断：配置了 AK/SK 的火山方舟走 OpenAPI；其它来源会像刷新一样重新加载已打开的控制台标签页再读，但不写 `state.json`。
+- `probe` 只读诊断：像刷新一样重新加载已打开的控制台标签页、或调用只读接口再读，但不写 `state.json`。
 - `serve` 生成一次性 token，只绑 `127.0.0.1`；打开页面会自动「刷新额度」（POST），「重新读取」仅 GET。Grok 卡片只显示周窗口。
 
 ## 数据与隐私
 
 - 数据文件：`${QUOTA_DATA_DIR:-~/.ai-quota-dashboard}/state.json`，目录 `0700`、文件 `0600`，原子写。
 - 只保存额度数值、重置时间、时间戳、默认窗口；**不保存** Cookie、Token、密码、页面 HTML、账号 ID。
-- 读取方式：通过 CDP 读取已登录标签页的 `document.body.innerText`；火山方舟配置 AK/SK 后改为本机签名调用只读 OpenAPI。不使用 Cookie/Network/Storage 导出能力。
-- 火山方舟 AK/SK 只在本机用于对 `open.volcengineapi.com` 的 HMAC-SHA256 请求签名；来自环境变量或 `~/.ai-quota-dashboard/credentials.json`，不写入 `state.json`，不进入浏览器。
+- 读取方式：控制台类来源通过 CDP 读取已登录标签页的 `document.body.innerText`；接口类来源用你自己配置的 key 直接调只读接口，不经过浏览器。不使用 Cookie/Network/Storage 导出能力。
 - 本地网页只监听回环地址；无外部请求、无 CDN、无遥测。
 - `quota --version` 打印当前数据格式版本（`schemaVersion`，当前为 3）。版本 2 的数据文件在读取时自动升级，额度数字保留；比 2 更旧、或比当前更新的版本退出 8，不写入。恢复：`quota clear --yes` 后重新抓取或录入。
 
@@ -144,8 +124,7 @@ quota --version
 | `cdp_unavailable` | 浏览器没开 9333：`quota doctor`，用 `--remote-debugging-port=9333` 重启 |
 | `not_logged_in` | 在该 profile 登录对应控制台，再 `quota fetch` |
 | `parse_failed` | `quota probe --source <src> --json` 看报告，必要时用 `--out` 保存 |
-| `auth_failed`（火山） | AK/SK 被接口拒绝：确认 SecretKey 完整、AccessKey 正确、子用户挂了 `ArkReadOnlyAccess` |
-| `config_error`（火山） | 只配了 AK/SK 的一半：补全 `VOLC_ACCESS_KEY` + `VOLC_SECRET_KEY` |
+| `auth_failed` | 接口拒绝了凭证：确认环境变量或凭证文件里的 key 完整、未过期，且账号仍有生效的订阅 |
 | 刷新后数字不变 | 刷新会 reload 对应控制台标签页再读；若仍不变，先用 `quota probe --source <src> --json` 确认页面本身已更新（平台可能延迟），再看标签页里显示的用量是否真的变了 |
 | 数据损坏 / 版本不符 | `quota clear --yes` |
 | 端口占用 | `quota serve --port 8788` |
@@ -165,7 +144,7 @@ mock 只在显式设置环境变量时生效。`AQD_TEST_MOCK` 是兼容别名�
 
 ## 已知限制
 
-- 依赖控制台页面结构，平台改版会导致解析失败；需要按提示更新解析器。火山方舟配置 AK/SK 后改走 OpenAPI，不受页面改版影响。
+- 依赖控制台页面结构，平台改版会导致解析失败；需要按提示更新解析器。接口类来源（DeepSeek、智谱、百炼、Codex）不吃页面结构，不受控制台改版影响。
 - X / Grok 没有公开额度接口。自动读取 `grok.com/dashboard` 上暴露的周用量百分比（`N% used`），换算成剩余 `100-N`%；没有 5 小时 / 月窗口。页面改版后用 `quota probe --source x-premium`。
 - 不处理登录、验证码、2FA；不做后台定时抓取。
 - 只支持单账户；多账户不在当前范围。

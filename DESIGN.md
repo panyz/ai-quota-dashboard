@@ -11,7 +11,6 @@ colors:
   ghost-wash: "#eceae3"
   terminus: "#c23b22"
   low: "#8a5a00"
-  route-volcengine: "#c8102e"
   route-opencode: "#1d4ed8"
   route-grok: "#141414"
   route-claude: "#c2410c"
@@ -132,9 +131,8 @@ The platform is warm and nearly neutral. Saturation belongs to the route, and on
 
 ### Primary
 
-There is no single brand hue. The primary color of a line is the route stored for that source. The same eight values paint the local page and the Harness strip.
+There is no single brand hue. The primary color of a line is the route stored for that source. The same seven values paint the local page and the Harness strip.
 
-- **Volcengine Crimson** (#c8102e): 火山引擎 Coding Plan.
 - **OpenCode Blue** (#1d4ed8): OpenCode Go.
 - **Grok Ink** (#141414): X Premium · Grok. This route is Rail Ink, not a separate hue.
 - **Claude Orange** (#c2410c): Claude.

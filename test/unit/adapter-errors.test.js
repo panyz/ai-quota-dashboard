@@ -5,7 +5,7 @@ import { classifyUnreachable } from "../../src/adapters/index.js";
 import { SOURCE_STATUSES } from "../../src/model.js";
 
 test("a Chrome error page is not a parser failure", () => {
-  const text = "无法访问此网站\n\nconsole.volcengine.com 意外终止了连接。\n\nERR_CONNECTION_CLOSED\n重新加载";
+  const text = "无法访问此网站\n\ngrok.com 意外终止了连接。\n\nERR_CONNECTION_CLOSED\n重新加载";
   const hit = classifyUnreachable("chrome-error://chromewebdata/", text);
   assert.equal(hit.code, "page_unreachable");
   assert.match(hit.message, /ERR_CONNECTION_CLOSED/);
@@ -13,8 +13,8 @@ test("a Chrome error page is not a parser failure", () => {
 });
 
 test("a real console page is left to the parser", () => {
-  const text = "火山方舟\n订阅\n立即登录使用";
-  assert.equal(classifyUnreachable("https://console.volcengine.com/ark/subscription/coding-plan", text), null);
+  const text = "Weekly included usage\n69% used";
+  assert.equal(classifyUnreachable("https://grok.com/dashboard/usage", text), null);
 });
 
 test("a net error on an otherwise real URL is still reported", () => {

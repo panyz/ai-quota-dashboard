@@ -24,50 +24,6 @@ const count = (key, label, periodMs, unit, advertised = true) => ({
 
 export const MANIFESTS = [
   {
-    id: "volcengine",
-    slug: "volcengine",
-    name: "火山引擎 Coding Plan",
-    shortName: "火山",
-    url: "https://console.volcengine.com/ark/region:cn-beijing/subscription/coding-plan",
-    // API when an AK/SK pair resolves (no browser session needed); otherwise the
-    // already-signed-in console tab, exactly as before.
-    transport: "auto",
-    aliases: ["volc"],
-    workspace: null,
-    defaultWindow: "auto",
-    auth: {
-      env: ["VOLC_ACCESS_KEY", "VOLCENGINE_ACCESS_KEY"],
-      secretEnv: ["VOLC_SECRET_KEY", "VOLCENGINE_SECRET_KEY"],
-      file: "~/.ai-quota-dashboard/credentials.json",
-      fields: ["VOLC_ACCESS_KEY", "accessKey"],
-      secretFields: ["VOLC_SECRET_KEY", "secretKey"],
-    },
-    api: {
-      method: "POST",
-      signing: "volcengine",
-      action: "GetCodingPlanUsage",
-      version: "2024-01-01",
-      service: "ark",
-      region: "cn-beijing",
-      url: "https://open.volcengineapi.com/",
-    },
-    ready: {
-      expr: `(() => {
-      const t = document.body.innerText || '';
-      if (/立即登录使用/.test(t)) return true;
-      const labelled = t.includes('套餐用量限额') || t.includes('我的订阅') || t.includes('开通管理');
-      return labelled && (/\\n[0-9]+(?:\\.[0-9]+)?\\s*\\n%\\s*\\n/.test(t) || /[0-9][0-9,]*\\s*\\/\\s*[0-9][0-9,]*/.test(t));
-    })()`,
-    },
-    parser: { kind: "module", name: "volcengine", version: "volc-v2" },
-    navigate: { reuseIncludes: ["/subscription/coding-plan", "/openManagement"] },
-    windows: [
-      percent("h5", "5 小时", 5 * HOUR),
-      percent("week", "周", 7 * DAY),
-      percent("month", "月", 30 * DAY),
-    ],
-  },
-  {
     id: "opencode_go",
     slug: "opencode-go",
     name: "OpenCode Go",

@@ -47,8 +47,6 @@ window.__ModuleLoader__.load({
       'dock.updated': '更新于 {time}',
       'dock.never': '未读取',
       'dock.details.empty': '暂无数据',
-      'source.volcengine': '火山引擎 Coding Plan',
-      'source.volcengine.short': '火山',
       'source.opencode_go': 'OpenCode Go',
       'source.opencode_go.short': 'OC',
       'source.x_premium': 'X Premium · Grok',
@@ -97,8 +95,6 @@ window.__ModuleLoader__.load({
       'dock.updated': 'Updated {time}',
       'dock.never': 'Not read yet',
       'dock.details.empty': 'No data yet',
-      'source.volcengine': 'Volcengine Coding Plan',
-      'source.volcengine.short': 'Volc',
       'source.opencode_go': 'OpenCode Go',
       'source.opencode_go.short': 'OC',
       'source.x_premium': 'X Premium · Grok',
@@ -762,7 +758,6 @@ window.__ModuleLoader__.load({
     }
 
     const LINE = {
-      volcengine: '#c8102e',
       opencode_go: '#1d4ed8',
       x_premium: '#141414',
       claude: '#c2410c',

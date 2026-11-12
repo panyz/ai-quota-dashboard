@@ -43,11 +43,11 @@ test("set auto-creates data dir 0700 + state.json 0600, no config.json", () => {
 
 test("fetch with mock only creates state.json (no config), exit 0", () => {
   const dir = tmp();
-  const r = run(["fetch", "--source", "volcengine", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "ok" });
+  const r = run(["fetch", "--source", "opencode-go", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "ok" });
   assert.equal(r.code, 0, r.stderr);
   assert.equal(existsSync(join(dir, "config.json")), false);
   const s = readState(dir);
-  assert.equal(s.sources.volcengine.windows.month.remaining, 40);
+  assert.equal(s.sources.opencode_go.windows.month.remaining, 70);
 });
 
 test("list --json empty state: schemaVersion=current, three null windows, meta defaults", () => {
@@ -56,11 +56,11 @@ test("list --json empty state: schemaVersion=current, three null windows, meta d
   assert.equal(r.code, 0, r.stderr);
   const d = json(r.stdout);
   assert.equal(d.schemaVersion, 3);
-  for (const id of ["opencode_go", "volcengine", "x_premium"]) assert.ok(d.sources[id]);
-  assert.deepEqual(Object.keys(d.sources.volcengine.windows), ["h5", "week", "month"]);
-  assert.equal(d.sources.volcengine.status, "never");
+  for (const id of ["opencode_go", "alibaba", "x_premium"]) assert.ok(d.sources[id]);
+  assert.deepEqual(Object.keys(d.sources.alibaba.windows), ["h5", "week", "month"]);
+  assert.equal(d.sources.alibaba.status, "never");
   assert.equal(d.sources.x_premium.status, "never");
-  assert.equal(d.sources.volcengine.defaultWindow, "auto");
+  assert.equal(d.sources.alibaba.defaultWindow, "h5");
   assert.equal(d.sources.opencode_go.defaultWindow, "h5");
   assert.ok(!JSON.stringify(d).match(/NaN|undefined/));
 });
@@ -70,19 +70,19 @@ test("sources --json lists built-in sources; --set-default writes meta", () => {
   const before = run(["sources", "--json"], { QUOTA_DATA_DIR: dir });
   assert.equal(before.code, 0, before.stderr);
   const d = json(before.stdout);
-  assert.deepEqual(d.sources.map((s) => s.id).slice(0, 3), ["volcengine", "opencode-go", "x-premium"]);
-  assert.equal(d.sources[1].workspace, "auto");
+  assert.deepEqual(d.sources.map((s) => s.id).slice(0, 3), ["opencode-go", "x-premium", "claude"]);
+  assert.equal(d.sources[0].workspace, "auto");
   assert.ok(d.sources[0].url);
-  assert.equal(d.sources[0].defaultWindow, "auto");
+  assert.equal(d.sources[0].defaultWindow, "h5");
   assert.equal(existsSync(join(dir, "config.json")), false);
 
-  assert.equal(run(["sources", "--set-default", "volcengine=week"], { QUOTA_DATA_DIR: dir }).code, 0);
+  assert.equal(run(["sources", "--set-default", "opencode-go=week"], { QUOTA_DATA_DIR: dir }).code, 0);
   const after = json(run(["sources", "--json"], { QUOTA_DATA_DIR: dir }).stdout);
   assert.equal(after.sources[0].defaultWindow, "week");
-  assert.equal(readState(dir).meta.defaultWindow.volcengine, "week");
+  assert.equal(readState(dir).meta.defaultWindow.opencode_go, "week");
 
   assert.equal(run(["sources", "--set-default", "nope=week"], { QUOTA_DATA_DIR: dir }).code, 2);
-  assert.equal(run(["sources", "--set-default", "volcengine=2h"], { QUOTA_DATA_DIR: dir }).code, 2);
+  assert.equal(run(["sources", "--set-default", "opencode-go=2h"], { QUOTA_DATA_DIR: dir }).code, 2);
 });
 
 test("set writes one window; others survive; status ok", () => {
@@ -109,7 +109,7 @@ test("set rejects bad input with exit 2 and leaves data untouched", () => {
     ["set", "x-premium", "--window", "h5", "--remaining", "-1", "--unit", "次"],
     ["set", "x-premium", "--window", "h5", "--remaining", "1", "--total", "0", "--unit", "次"],
     ["set", "x-premium", "--window", "h5", "--remaining", "5", "--total", "1", "--unit", "次"],
-    ["set", "volcengine", "--window", "h5", "--remaining", "1", "--unit", "次"],
+    ["set", "claude", "--window", "h5", "--remaining", "1", "--unit", "次"],
     ["set", "nope", "--window", "h5", "--remaining", "1", "--unit", "次"],
   ];
   for (const args of cases) {
@@ -155,52 +155,43 @@ test("--timeout is one total budget for the whole command", () => {
 test("failed attempt keeps old windows and records status", () => {
   const dir = tmp();
   run(["fetch", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "ok" });
-  assert.equal(readState(dir).sources.volcengine.windows.week.remaining, 30);
-  const r = run(["fetch", "--source", "volcengine", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "not_logged_in" });
+  assert.equal(readState(dir).sources.opencode_go.windows.week.remaining, 80);
+  const r = run(["fetch", "--source", "opencode-go", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "not_logged_in" });
   assert.equal(r.code, 4);
-  const s = readState(dir).sources.volcengine;
-  assert.equal(s.windows.week.remaining, 30);
+  const s = readState(dir).sources.opencode_go;
+  assert.equal(s.windows.week.remaining, 80);
   assert.equal(s.status, "not_logged_in");
 });
 
 test("partial windows: h5 updates, week/month kept, missingWindows reported, exit 7", () => {
   const dir = tmp();
   run(["fetch", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "ok" });
-  const r = run(["fetch", "--source", "volcengine", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "partial_windows" });
+  const r = run(["fetch", "--source", "opencode-go", "--json"], { QUOTA_DATA_DIR: dir, QUOTA_TEST_MOCK: "partial_windows" });
   assert.equal(r.code, 7);
   const d = json(r.stdout);
-  assert.equal(d.sources.volcengine.status, "partial");
-  assert.deepEqual(d.sources.volcengine.error.missingWindows.sort(), ["month", "week"]);
-  const s = readState(dir).sources.volcengine;
+  assert.equal(d.sources.opencode_go.status, "partial");
+  assert.deepEqual(d.sources.opencode_go.error.missingWindows.sort(), ["month", "week"]);
+  const s = readState(dir).sources.opencode_go;
   assert.equal(s.windows.h5.remaining, 30);
-  assert.equal(s.windows.week.remaining, 30);
-  assert.equal(s.windows.month.remaining, 40);
+  assert.equal(s.windows.week.remaining, 80);
+  assert.equal(s.windows.month.remaining, 70);
 });
 
 test("CDP down: fetch 3; doctor 3 with hints and no config check", () => {
   const dir = tmp();
-  const r = run(["fetch", "--source", "volcengine", "--json"], { QUOTA_DATA_DIR: dir });
+  const r = run(["fetch", "--source", "x-premium", "--json"], { QUOTA_DATA_DIR: dir });
   assert.equal(r.code, 3);
-  assert.equal(json(r.stdout).sources.volcengine.error.code, "cdp_unavailable");
+  assert.equal(json(r.stdout).sources.x_premium.error.code, "cdp_unavailable");
 
-  const doc = run(["doctor", "--json"], {
-    QUOTA_DATA_DIR: dir,
-    HOME: tmp(),
-    VOLC_ACCESS_KEY: "",
-    VOLC_SECRET_KEY: "",
-    VOLCENGINE_ACCESS_KEY: "",
-    VOLCENGINE_SECRET_KEY: "",
-  });
+  const doc = run(["doctor", "--json"], { QUOTA_DATA_DIR: dir, HOME: tmp() });
   assert.equal(doc.code, 3);
   const d = json(doc.stdout);
   assert.equal(d.ok, false);
-  assert.deepEqual(Object.keys(d.checks).sort(), ["cdp", "dataDir", "schema", "serverPort", "volcengine"]);
+  assert.deepEqual(Object.keys(d.checks).sort(), ["cdp", "dataDir", "schema", "serverPort"]);
   assert.equal(d.checks.cdp.status, "fail");
   assert.match(d.checks.cdp.message, /127\.0\.0\.1:9333/);
   assert.match(d.checks.cdp.message, /--remote-debugging-port=9333/);
   assert.equal(d.checks.schema.status, "ok");
-  assert.equal(d.checks.volcengine.status, "warn");
-  assert.match(d.checks.volcengine.message, /VOLC_ACCESS_KEY/);
 });
 
 test("doctor: busy server port is warn, not fail", async () => {
@@ -227,7 +218,7 @@ test("schemaVersion+1: show/fetch/set exit 8 and never rewrite the file (BUG-21)
   const doc = {
     schemaVersion: 4,
     sources: {},
-    meta: { lastFetchAt: null, defaultWindow: { volcengine: "auto", opencode_go: "h5", x_premium: "h5" } },
+    meta: { lastFetchAt: null, defaultWindow: { opencode_go: "h5", x_premium: "h5" } },
   };
   writeFileSync(join(dir, "state.json"), JSON.stringify(doc));
   const before = bytes(dir);
@@ -252,7 +243,7 @@ test("schemaVersion 2 migrates on read and keeps the numbers", () => {
     JSON.stringify({
       schemaVersion: 2,
       sources: {
-        volcengine: {
+        claude: {
           status: "ok",
           mode: "auto",
           windows: {
@@ -260,15 +251,15 @@ test("schemaVersion 2 migrates on read and keeps the numbers", () => {
           },
         },
       },
-      meta: { lastFetchAt: updatedAt, defaultWindow: { volcengine: "auto", opencode_go: "h5", x_premium: "week" } },
+      meta: { lastFetchAt: updatedAt, defaultWindow: { claude: "auto", opencode_go: "h5", x_premium: "week" } },
     }),
   );
   const r = run(["list", "--json"], { QUOTA_DATA_DIR: dir });
   assert.equal(r.code, 0, r.stderr);
-  assert.equal(json(r.stdout).sources.volcengine.windows.h5.remaining, 98.88);
+  assert.equal(json(r.stdout).sources.claude.windows.h5.remaining, 98.88);
   const stored = readState(dir);
   assert.equal(stored.schemaVersion, 3);
-  assert.equal(stored.sources.volcengine.windows.h5.remaining, 98.88);
+  assert.equal(stored.sources.claude.windows.h5.remaining, 98.88);
   assert.equal(stored.meta.migratedFrom, 2);
 });
 
@@ -307,7 +298,7 @@ test("probe is read-only, takes --source, and exits 3 when CDP is down", () => {
   const dir = tmp();
   run(["set", "x-premium", "--window", "h5", "--remaining", "5", "--unit", "次"], { QUOTA_DATA_DIR: dir });
   const before = bytes(dir);
-  const r = run(["probe", "--source", "volcengine", "--json"], { QUOTA_DATA_DIR: dir });
+  const r = run(["probe", "--source", "opencode-go", "--json"], { QUOTA_DATA_DIR: dir });
   assert.equal(r.code, 3);
   const d = json(r.stdout);
   assert.equal(d.ok, false);
@@ -318,7 +309,7 @@ test("probe is read-only, takes --source, and exits 3 when CDP is down", () => {
 
 test("unknown flag / command / --version", () => {
   const dir = tmp();
-  const bad = run(["list", "--source", "volc", "--json"], { QUOTA_DATA_DIR: dir });
+  const bad = run(["list", "--source", "bogus", "--json"], { QUOTA_DATA_DIR: dir });
   assert.equal(bad.code, 2);
   assert.equal(bad.stdout, "");
   assert.match(bad.stderr, /未知参数/);

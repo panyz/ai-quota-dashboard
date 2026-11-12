@@ -11,13 +11,6 @@ function ready(id, text) {
   return Boolean(new Function("document", `return ${READY_CHECKS[id]()}`)(document));
 }
 
-test("volcengine: real pages are ready, the loading state is not", () => {
-  assert.equal(ready("volcengine", fixture("volc-subscribe.txt")), true);
-  assert.equal(ready("volcengine", fixture("volc-subscribe-exhausted.txt")), true);
-  assert.equal(ready("volcengine", fixture("volc-signed-out.txt")), true, "signed-out short-circuits instead of waiting");
-  assert.equal(ready("volcengine", "套餐用量限额\n用量加载中\n开始使用 Coding Plan"), false);
-});
-
 test("opencode: quota pages are ready, labels without numbers are not", () => {
   assert.equal(ready("opencode_go", fixture("opencode-go-page.txt")), true);
   assert.equal(ready("opencode_go", fixture("opencode-activity-page.txt")), true);

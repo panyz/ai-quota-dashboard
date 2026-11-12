@@ -18,10 +18,6 @@ function windowValue(remaining, total, unit = "次") {
 }
 
 const OK_WINDOWS = {
-  volcengine: {
-    windows: { h5: windowValue(80, 100, "%"), week: windowValue(30, 100, "%"), month: windowValue(40, 100, "%") },
-    mainWindow: "month",
-  },
   opencode_go: {
     windows: { h5: windowValue(90, 100, "%"), week: windowValue(80, 100, "%"), month: windowValue(70, 100, "%") },
     mainWindow: "h5",
@@ -77,15 +73,15 @@ export async function mockRead(id, { mode, budgetMs = 2000 } = {}) {
       await sleep(Math.max(0, Math.min(2000, budgetMs)));
       return fail("timeout");
     case "partial_source":
-      return id === "volcengine"
-        ? { ok: true, ...OK_WINDOWS.volcengine, adapterVersion: "mock-v1" }
+      return id === "opencode_go"
+        ? { ok: true, ...OK_WINDOWS.opencode_go, adapterVersion: "mock-v1" }
         : fail("not_logged_in");
     case "mixed_failure":
-      return id === "volcengine" ? fail("not_logged_in") : fail("parse_failed");
+      return id === "opencode_go" ? fail("not_logged_in") : fail("parse_failed");
     case "partial_windows":
-      return id === "volcengine"
+      return id === "opencode_go"
         ? { ok: true, windows: { h5: windowValue(30, 100) }, mainWindow: "h5", adapterVersion: "mock-v1" }
-        : { ok: true, ...OK_WINDOWS.opencode_go, adapterVersion: "mock-v1" };
+        : { ok: true, ...OK_WINDOWS[id], adapterVersion: "mock-v1" };
     case "ok":
     default:
       return { ok: true, ...OK_WINDOWS[id], adapterVersion: "mock-v1" };

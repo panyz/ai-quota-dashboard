@@ -58,12 +58,6 @@
         "canonical": "oklch(50.8% 0.108 73.3)",
         "tonalRamp": ["#130900", "#341f00", "#5b3b05", "#855912", "#ad7b32", "#d4a059", "#f9c37c", "#feebd4"]
       },
-      "route-volcengine": {
-        "role": "primary",
-        "displayName": "Volcengine Crimson",
-        "canonical": "oklch(53.0% 0.207 22.3)",
-        "tonalRamp": ["#1e0002", "#49040c", "#7f061a", "#b7152c", "#e93d48", "#fa817f", "#fcbbb7", "#fee9e7"]
-      },
       "route-opencode": {
         "role": "primary",
         "displayName": "OpenCode Blue",
