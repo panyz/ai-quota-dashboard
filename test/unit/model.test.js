@@ -8,6 +8,8 @@ import {
   normalizeWindow,
   resolveSource,
   SCHEMA_VERSION,
+  SOURCE_STATUSES,
+  SOURCE_STATUS_LABELS,
   WINDOW_KEYS,
 } from "../../src/model.js";
 
@@ -75,6 +77,37 @@ test("auto source keeps a stored ok status", () => {
   const { state } = normalizeState(clone(doc));
   assert.equal(state.sources.x_premium.status, "ok");
   assert.equal(state.sources.x_premium.mode, "auto");
+});
+
+test("a rejected credential is not rewritten to never on the next read", () => {
+  // BUG: auth_failed was missing from SOURCE_STATUSES, so normalizeSource()
+  // reset it to "never" the moment the state file was read again.
+  const doc = emptyState();
+  doc.sources.alibaba.status = "auth_failed";
+  doc.sources.alibaba.error = { code: "auth_failed", message: "凭证被拒绝（HTTP 401）" };
+  const { state } = normalizeState(clone(doc));
+  assert.equal(state.sources.alibaba.status, "auth_failed");
+  assert.equal(state.sources.alibaba.error.code, "auth_failed");
+});
+
+test("every code a read can report is a status the state file keeps", () => {
+  const codes = [
+    "cdp_unavailable",
+    "not_logged_in",
+    "auth_failed",
+    "parse_failed",
+    "page_unreachable",
+    "timeout",
+    "config_error",
+    "unsupported",
+  ];
+  for (const code of codes) {
+    const doc = emptyState();
+    doc.sources.codex.status = code;
+    assert.equal(normalizeState(clone(doc)).state.sources.codex.status, code, `${code} must survive normalization`);
+    assert.ok(SOURCE_STATUSES.includes(code), `${code} must be declared in SOURCE_STATUSES`);
+    assert.ok(SOURCE_STATUS_LABELS[code], `${code} must have a display label`);
+  }
 });
 
 test("effective default window comes from meta.defaultWindow", () => {

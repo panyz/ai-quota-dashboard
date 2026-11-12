@@ -6,3 +6,9 @@ state.json
 test/*.png
 coverage/
 .env
+
+# Local editor / design-tool state and research notes: kept out of the published project.
+# Drop the docs/ line if you decide to publish the research notes.
+.cursor/
+.impeccable/
+docs/

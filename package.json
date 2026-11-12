@@ -4,6 +4,30 @@
   "type": "module",
   "description": "Local CLI + Harness plugin for AI subscription quotas, reading already-signed-in console pages through CDP.",
   "license": "MIT",
+  "author": "Joe Pan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/panyz/ai-quota-dashboard.git"
+  },
+  "homepage": "https://github.com/panyz/ai-quota-dashboard#readme",
+  "bugs": {
+    "url": "https://github.com/panyz/ai-quota-dashboard/issues"
+  },
+  "keywords": [
+    "ai",
+    "quota",
+    "usage",
+    "dashboard",
+    "cli",
+    "cdp",
+    "claude",
+    "codex",
+    "deepseek",
+    "zhipu",
+    "opencode",
+    "grok",
+    "dsh"
+  ],
   "main": "./index.js",
   "exports": {
     ".": "./index.js",

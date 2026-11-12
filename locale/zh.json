@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "AI 额度面板",
-    "description": "在输入框上方显示火山引擎 Coding Plan、OpenCode Go、X Premium · Grok 的剩余额度与重置时间。"
+    "description": "在输入框上方显示已接入的 AI 订阅剩余额度与重置时间：OpenCode Go、X Premium · Grok、Claude、智谱 GLM、DeepSeek、阿里云百炼、OpenAI Codex。"
   }
 }

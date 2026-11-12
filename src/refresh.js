@@ -21,6 +21,9 @@ export const EXIT = Object.freeze({
 const CODE_EXIT = {
   cdp_unavailable: EXIT.cdp,
   not_logged_in: EXIT.login,
+  // A missing credential is the user's move too: point at the same exit code as
+  // a rejected one instead of reporting "all failed with different codes" (1).
+  config_error: EXIT.login,
   auth_failed: EXIT.login,
   parse_failed: EXIT.parse,
   page_unreachable: EXIT.page,

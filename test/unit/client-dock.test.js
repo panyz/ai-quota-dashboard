@@ -114,11 +114,28 @@ const UNREAD_VIEW = {
 
 const ANCHOR = { getBoundingClientRect: () => ({ left: 100, right: 200, top: 700, bottom: 720, width: 100, height: 20 }) };
 
+/** English copy, as the host locale would resolve it. */
+const EN = {
+  "source.opencode_go": "OpenCode Go",
+  "source.opencode_go.short": "OC",
+  "source.x_premium": "X Premium · Grok",
+  "source.x_premium.short": "Grok",
+  "source.zhipu": "Zhipu GLM Coding Plan",
+  "source.zhipu.short": "GLM",
+  "window.h5": "5-hour",
+  "window.week": "Week",
+  "status.parse_failed": "Parse failed",
+  "dock.details": "Remaining quota",
+};
+const en = (key) => EN[key] ?? key;
+
 /**
  * Load client.js against stubs and render both components with `view` loaded.
  * @param {object} view
+ * @param {{translate?: (key: string) => string}} [options]
  */
-async function render(view) {
+async function render(view, options = {}) {
+  const translate = options.translate ?? ((key) => key);
   const effects = [];
   const React = {
     createElement(type, props, ...children) {
@@ -194,7 +211,7 @@ async function render(view) {
   plugin.apply({
     get: (name) =>
       name === "locale"
-        ? { bind: () => (key) => key, register: () => () => {}, subscribe: () => () => {} }
+        ? { bind: () => translate, register: () => () => {}, subscribe: () => () => {} }
         : null,
     effect: (fn) => fn(),
     slots: {
@@ -299,4 +316,22 @@ test("a dashboard with no readings at all renders the empty state", async () => 
   assert.equal(walk(dock).some((node) => classOf(node) === "aqd-chips"), false, "the strip renders no chip row");
   assert.deepEqual(byClass(popover, "aqd-src-name"), [], "the popover lists no source");
   assert.deepEqual(byClass(popover, "aqd-muted aqd-pad").map(textIn), ["dock.details.empty"]);
+});
+
+test("locale copy wins over the Chinese labels the host half sends", async () => {
+  // The view carries Chinese names/labels; preferring them made the strip
+  // Chinese-only even when the host locale was English.
+  const { dock, popover } = await render(MIXED_VIEW, { translate: en });
+
+  assert.deepEqual(byClass(dock, "aqd-chip-name").map(textIn), ["OC", "Grok", "GLM"]);
+  assert.deepEqual(byClass(popover, "aqd-src-name").map(textIn), [
+    "OpenCode Go",
+    "X Premium · Grok",
+    "Zhipu GLM Coding Plan",
+  ]);
+  const labels = byClass(popover, "aqd-win-k").map(textIn);
+  assert.ok(labels.includes("5-hour"), "window labels follow the locale");
+  assert.ok(labels.includes("Week"), "window labels follow the locale");
+  assert.ok(!labels.includes("5 小时"), "the view's Chinese window labels lose to the locale");
+  assert.ok(textIn(popover).includes("Parse failed"), "status follows the locale");
 });

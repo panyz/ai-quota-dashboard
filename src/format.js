@@ -86,7 +86,7 @@ export function sourceStatusText(status) {
 
 export function badgeText(badge) {
   if (badge === "low") return "偏低";
-  if (badge === "used_up") return "已用完";
+  if (badge === "used_up") return "已用尽";
   return null;
 }
 

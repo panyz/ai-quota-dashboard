@@ -74,6 +74,9 @@ export function resolveSource(raw) {
   return registry.resolve(raw);
 }
 
+// Every status a read can leave behind must be listed here: normalizeSource()
+// resets anything it does not recognise to "never", which would silently turn a
+// rejected credential into "never read".
 export const SOURCE_STATUSES = Object.freeze([
   "never",
   "ok",
@@ -85,6 +88,8 @@ export const SOURCE_STATUSES = Object.freeze([
   "timeout",
   "cdp_unavailable",
   "config_error",
+  "auth_failed",
+  "unsupported",
 ]);
 
 export const WINDOW_STATUSES = Object.freeze(["ok", "stale", "expired", "reset_passed"]);
@@ -101,6 +106,7 @@ export const SOURCE_STATUS_LABELS = Object.freeze({
   cdp_unavailable: "调试端口未开",
   config_error: "缺少凭证",
   auth_failed: "凭证被拒绝",
+  unsupported: "不支持自动读取",
 });
 
 export const WINDOW_STATUS_LABELS = Object.freeze({

@@ -143,6 +143,20 @@ test("AQD_TEST_MOCK remains a compatibility alias", () => {
   assert.equal(r.code, 0, r.stderr);
 });
 
+test("a source without credentials exits 4 and keeps config_error in the state file", () => {
+  // HOME points at an empty dir so no official client credential file is found.
+  const dir = join(tmp(), "data");
+  const home = tmp();
+  const r = run(["fetch", "--source", "claude", "--json"], {
+    QUOTA_DATA_DIR: dir,
+    HOME: home,
+    ANTHROPIC_OAUTH_TOKEN: "",
+  });
+  assert.equal(r.code, 4, `counted as a credential problem, not a mixed failure: ${r.stderr}`);
+  assert.equal(json(r.stdout).sources.claude.status, "config_error");
+  assert.equal(readState(dir).sources.claude.status, "config_error");
+});
+
 test("--timeout is one total budget for the whole command", () => {
   const dir = tmp();
   const started = Date.now();

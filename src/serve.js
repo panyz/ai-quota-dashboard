@@ -44,10 +44,9 @@ export function createAppServer({ token, port = 8787 }) {
         const { state } = readState();
         return json(res, 200, buildView(state));
       } catch (err) {
-        const dataError = ["CORRUPT", "UNKNOWN_VERSION", "STALE_VERSION"].includes(err.code);
         return json(res, 500, {
           ok: false,
-          error: dataError ? "data_error" : "data_error",
+          error: "data_error",
           message:
             err.code === "UNKNOWN_VERSION"
               ? "数据版本较新，请升级 CLI"

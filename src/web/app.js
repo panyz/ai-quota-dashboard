@@ -11,8 +11,9 @@ const SOURCE_STATUS = {
   page_unreachable: "页面打不开",
   timeout: "读取超时",
   cdp_unavailable: "调试端口未开",
-  config_error: "配置错误",
+  config_error: "缺少凭证",
   auth_failed: "凭证被拒绝",
+  unsupported: "不支持自动读取",
 };
 const HINTS = {
   cdp_unavailable: "用 --remote-debugging-port=9333 启动 Chrome，再点“刷新额度”。",
@@ -20,7 +21,9 @@ const HINTS = {
   parse_failed: "页面结构可能已变化：运行 quota probe <source> 抓文本，或先手动 quota set。",
   page_unreachable: "浏览器没打开该站点：确认同一浏览器里能手动打开，再点“刷新额度”。",
   timeout: "读取超时：检查页面是否加载完成，稍后重试。",
-  auth_failed: "接口拒绝了凭证：检查 AK/SK 是否完整、子用户是否挂载只读策略。",
+  config_error: "缺少凭证：按 README 设置该源的环境变量，或先登录对应的官方客户端，再点“刷新额度”。",
+  auth_failed: "接口拒绝了这个 key：确认凭证完整、未过期，且账号上仍有生效的订阅。",
+  unsupported: "这个源只能手动录入：用 quota set 写入一个窗口。",
   data_error: "数据文件不可用：运行 quota clear --yes 后重新录入。",
   partial: "部分窗口本次未读取，已保留上次数据。",
 };
@@ -85,7 +88,7 @@ function resetText(w) {
 }
 function badgeOf(w) {
   if (!w) return null;
-  if (w.remaining <= 0) return "已用完";
+  if (w.remaining <= 0) return "已用尽";
   if (typeof w.total === "number" && w.total > 0 && w.remaining / w.total <= 0.2) return "偏低";
   return null;
 }
@@ -130,7 +133,7 @@ function card(id, s) {
   const w = eff && s.windows ? s.windows[eff] : null;
   const at = usedAt(w);
   const badge = badgeOf(w);
-  const tone = badge === "已用完" ? " spent" : badge === "偏低" ? " low" : at === null ? " idle" : "";
+  const tone = badge === "已用尽" ? " spent" : badge === "偏低" ? " low" : at === null ? " idle" : "";
   const status = SOURCE_STATUS[s.status] ?? s.status ?? "未读取";
   const statusClass = s.status && s.status !== "ok" && s.status !== "manual" && s.status !== "never" ? " bad" : "";
   const stations = keys

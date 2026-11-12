@@ -35,23 +35,29 @@ const USAGE = `quota — 本地 AI 额度聚合 CLI（schema ${SCHEMA_VERSION}�
 用法:
   quota fetch [--source <源>|all] [--timeout 秒] [--json]
                                           读取自动源（--timeout 是整条命令的总预算）
-  quota list [source] [--json]            查看全部或单个源
+  quota list [源] [--json]                查看全部或单个源
   quota set x-premium --window h5|week|month --remaining N
         [--total N] [--unit %] [--reset-at ISO] [--json]
                                           手动覆盖（解析失败时）
-  quota sources [--json] [--set-default opencode_go=week]
+  quota sources [--json] [--set-default <源>=<窗口|auto>]
                                           内置源；写 state.meta.defaultWindow
-  quota probe --source opencode-go|x-premium|alibaba [--json] [--out FILE]
+  quota probe --source <源> [--json] [--out FILE]
                                           只读诊断（会 reload 标签页），不改数据
   quota clear --yes                       清空额度数据（别名 reset）
   quota doctor [--json]                   自检 dataDir/cdp/serverPort/schema
   quota serve [--port 8787]               本地看板（带访问 token）
   quota --version                         打印数据版本（= schemaVersion）
 
+源:     quota sources 列出全部 id 与别名，例如 opencode-go / x-premium / claude /
+        zhipu / deepseek / alibaba / codex
 退出码: 0 成功 / 1 全部失败且错误不同 / 2 参数 / 3 CDP 不可用 /
-        4 未登录 / 5 解析失败 / 6 超时 / 7 部分成功 / 8 数据或端口错误
+        4 未登录 / 缺少凭证或被拒绝 / 5 解析失败 / 6 超时 / 7 部分成功 /
+        8 数据或端口错误 / 9 页面打不开
 环境:   QUOTA_DATA_DIR=~/.ai-quota-dashboard   QUOTA_TEST_MOCK（测试构建）
-        QUOTA_CDP（覆盖 CDP 地址，默认 http://127.0.0.1:9333）`;
+        QUOTA_CDP（覆盖 CDP 地址，默认 http://127.0.0.1:9333）
+        API 源的 key: ANTHROPIC_OAUTH_TOKEN / Z_AI_API_KEY / DEEPSEEK_API_KEY /
+        ALIBABA_CODING_PLAN_API_KEY / CODEX_ACCESS_TOKEN（也可用官方客户端
+        已经写在本机的凭证文件；详见 README）`;
 
 export const FLAGS = Symbol("flags");
 

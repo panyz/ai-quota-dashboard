@@ -34,6 +34,7 @@ window.__ModuleLoader__.load({
       'cdp_unavailable',
       'config_error',
       'auth_failed',
+      'unsupported',
     ];
 
     const ZH = {
@@ -51,9 +52,22 @@ window.__ModuleLoader__.load({
       'source.opencode_go.short': 'OC',
       'source.x_premium': 'X Premium · Grok',
       'source.x_premium.short': 'Grok',
+      'source.claude': 'Claude',
+      'source.claude.short': 'Claude',
+      'source.zhipu': '智谱 GLM Coding Plan',
+      'source.zhipu.short': '智谱',
+      'source.deepseek': 'DeepSeek',
+      'source.deepseek.short': 'DeepSeek',
+      'source.alibaba': '阿里云百炼 Coding Plan',
+      'source.alibaba.short': '百炼',
+      'source.codex': 'OpenAI Codex',
+      'source.codex.short': 'Codex',
       'window.h5': '5 小时',
       'window.week': '周',
       'window.month': '月',
+      'window.sonnet': 'Sonnet 周',
+      'window.opus': 'Opus 周',
+      'window.balance': '余额',
       'status.never': '未读取',
       'status.ok': '正常',
       'status.partial': '部分成功',
@@ -65,6 +79,7 @@ window.__ModuleLoader__.load({
       'status.cdp_unavailable': '浏览器未连接',
       'status.config_error': '缺少凭证',
       'status.auth_failed': '凭证被拒绝',
+      'status.unsupported': '不支持自动读取',
       'status.unknown': '状态未知',
       'badge.low': '偏低',
       'badge.used_up': '已用尽',
@@ -99,9 +114,22 @@ window.__ModuleLoader__.load({
       'source.opencode_go.short': 'OC',
       'source.x_premium': 'X Premium · Grok',
       'source.x_premium.short': 'Grok',
+      'source.claude': 'Claude',
+      'source.claude.short': 'Claude',
+      'source.zhipu': 'Zhipu GLM Coding Plan',
+      'source.zhipu.short': 'GLM',
+      'source.deepseek': 'DeepSeek',
+      'source.deepseek.short': 'DeepSeek',
+      'source.alibaba': 'Alibaba Bailian Coding Plan',
+      'source.alibaba.short': 'Bailian',
+      'source.codex': 'OpenAI Codex',
+      'source.codex.short': 'Codex',
       'window.h5': '5-hour',
       'window.week': 'Week',
       'window.month': 'Month',
+      'window.sonnet': 'Sonnet week',
+      'window.opus': 'Opus week',
+      'window.balance': 'Balance',
       'status.never': 'Not read',
       'status.ok': 'OK',
       'status.partial': 'Partial',
@@ -113,6 +141,7 @@ window.__ModuleLoader__.load({
       'status.cdp_unavailable': 'Browser unavailable',
       'status.config_error': 'Missing credential',
       'status.auth_failed': 'Credential rejected',
+      'status.unsupported': 'Manual only',
       'status.unknown': 'Unknown',
       'badge.low': 'Low',
       'badge.used_up': 'Used up',
@@ -600,22 +629,38 @@ window.__ModuleLoader__.load({
       return tr(STATUS_KEYS.includes(status) ? 'status.' + status : 'status.unknown');
     }
 
+    /**
+    * Locale copy wins over the name the host half sends: the view always carries
+    * Chinese labels, so preferring them would make the strip Chinese-only. A
+    * source the dictionary does not know yet still falls back to the view.
+    * @param {string} key
+    * @returns {string|null} null when the dictionary has no entry
+    */
+    function translatedOrNull(key) {
+      const value = tr(key);
+      return typeof value === 'string' && value && value !== key ? value : null;
+    }
+
     function windowLabel(key, source) {
+      const translated = translatedOrNull('window.' + key);
+      if (translated) return translated;
       const labels = source && source.windowLabels;
       if (labels && typeof labels[key] === 'string' && labels[key]) return labels[key];
-      const translated = tr('window.' + key);
-      return translated === 'window.' + key ? key : translated;
+      return key;
     }
 
     function sourceName(id, source) {
+      const translated = translatedOrNull('source.' + id);
+      if (translated) return translated;
       if (source && source.name) return source.name;
-      return tr('source.' + id);
+      return id;
     }
 
     function sourceShort(id, source) {
+      const translated = translatedOrNull('source.' + id + '.short');
+      if (translated) return translated;
       if (source && source.shortName) return source.shortName;
-      const translated = tr('source.' + id + '.short');
-      return translated === 'source.' + id + '.short' ? sourceName(id, source) : translated;
+      return sourceName(id, source);
     }
 
     function chipTitle(id, source) {

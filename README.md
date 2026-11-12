@@ -9,7 +9,7 @@
 ## 功能
 
 - 聚合：OpenCode Go、X Premium（Grok）、Claude、智谱 GLM、DeepSeek、阿里云百炼、OpenAI Codex
-- 每端固定 5 小时 / 周 / 月 三个窗口，各自显示剩余、总量、重置时间、更新时间
+- 每个来源按自己声明的窗口展示（5 小时 / 周 / 月 / Sonnet 周 / Opus 周 / 余额），各自显示剩余、总量、重置时间、更新时间
 - 缺失或未读到的窗口保留旧值并标注，不补 0、不猜值
 - 过期、未登录、调试端口不可用、页面改版都有明确状态与处理提示
 - 本地网页看板，只绑 `127.0.0.1`，带一次性 token
@@ -21,10 +21,18 @@
 - Chrome，另开一个专用 profile 并启用调试端口：
 
 ```bash
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+# macOS
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9333 \
+  --user-data-dir="$HOME/.chrome-agent"
+
+# Linux
+google-chrome \
   --remote-debugging-port=9333 \
   --user-data-dir="$HOME/.chrome-agent"
 ```
+
+- 只有控制台类来源（OpenCode Go、X Premium）需要这一步；接口类来源不经过浏览器。不打算用这两个来源的话，可以跳过 Chrome，只配 key。
 
 - 在这个 profile 里**自行登录**要用到的控制台。本工具不处理登录、验证码或 2FA。
 - 接口类来源使用你自己的 key，或官方客户端已经写在本机的凭证。不会把凭证写入 `state.json`。
@@ -76,19 +84,22 @@ plugin_manager action=install_bundle target=/绝对路径/ai-quota-dashboard-for
 ## 命令
 
 ```bash
-quota fetch [--source opencode-go|x-premium|all] [--timeout 秒] [--json]
-quota list [source] [--json]
+quota fetch [--source <源>|all] [--timeout 秒] [--json]
+quota list [源] [--json]
 quota set x-premium --window week --remaining 31 --total 100 --unit % [--reset-at ISO] [--json]
-quota sources [--json] [--set-default opencode-go=week]
-quota probe --source opencode-go|x-premium [--json] [--out FILE]
+quota sources [--json] [--set-default <源>=<窗口|auto>]
+quota probe --source <源> [--json] [--out FILE]
 quota clear --yes            # 别名 reset
 quota doctor [--json]
 quota serve [--port 8787]
 quota --version
 ```
 
+`<源>` 可写 id 或别名（`quota sources` 会全部列出）：`opencode-go`、`x-premium`、`claude`、`zhipu`、`deepseek`、`alibaba`、`codex`。
+
 - `fetch` 逐源读取；只合并本次读到的窗口，没读到的保留旧值并在 `error.missingWindows` 标出。
-- `--timeout` 是整条命令的总预算，不是每源各算。
+- `fetch` 默认读取全部自动源；没配 key、没开调试端口的源会被记为各自的错误码（如 `config_error`、`cdp_unavailable`），不影响其它源的结果，但整条命令会以部分成功（7）退出。只用其中一两家时建议加 `--source`。
+- `--timeout` 是整条命令的总预算，不是每源各算。源越多、控制台越慢，越需要放宽这个值。
 - `set` 只允许 `x-premium`（解析失败时的手动覆盖），窗口固定 `h5|week|month`，一次只写一个窗口。
 - `sources --set-default` 写入 `state.meta.defaultWindow`，不生成配置文件。
 - `probe` 只读诊断：像刷新一样重新加载已打开的控制台标签页、或调用只读接口再读，但不写 `state.json`。
@@ -110,7 +121,7 @@ quota --version
 | 1 | 全部失败，且各源错误码不同 |
 | 2 | 参数错误 |
 | 3 | CDP 不可用（9333 未监听） |
-| 4 | 未登录 / 凭证被拒绝 |
+| 4 | 未登录 / 缺少凭证或被拒绝 |
 | 5 | 解析失败（页面改版） |
 | 6 | 超时 |
 | 7 | 部分成功（部分源或部分窗口） |
@@ -124,6 +135,7 @@ quota --version
 | `cdp_unavailable` | 浏览器没开 9333：`quota doctor`，用 `--remote-debugging-port=9333` 重启 |
 | `not_logged_in` | 在该 profile 登录对应控制台，再 `quota fetch` |
 | `parse_failed` | `quota probe --source <src> --json` 看报告，必要时用 `--out` 保存 |
+| `config_error` | 这个源没有凭证：按上表设置环境变量，或先登录对应的官方客户端，再 `quota fetch` |
 | `auth_failed` | 接口拒绝了凭证：确认环境变量或凭证文件里的 key 完整、未过期，且账号仍有生效的订阅 |
 | 刷新后数字不变 | 刷新会 reload 对应控制台标签页再读；若仍不变，先用 `quota probe --source <src> --json` 确认页面本身已更新（平台可能延迟），再看标签页里显示的用量是否真的变了 |
 | 数据损坏 / 版本不符 | `quota clear --yes` |
@@ -144,10 +156,16 @@ mock 只在显式设置环境变量时生效。`AQD_TEST_MOCK` 是兼容别名�
 
 ## 已知限制
 
-- 依赖控制台页面结构，平台改版会导致解析失败；需要按提示更新解析器。接口类来源（DeepSeek、智谱、百炼、Codex）不吃页面结构，不受控制台改版影响。
+- 依赖控制台页面结构，平台改版会导致解析失败；需要按提示更新解析器。接口类来源（Claude、DeepSeek、智谱、百炼、Codex）不吃页面结构，不受控制台改版影响。
 - X / Grok 没有公开额度接口。自动读取 `grok.com/dashboard` 上暴露的周用量百分比（`N% used`），换算成剩余 `100-N`%；没有 5 小时 / 月窗口。页面改版后用 `quota probe --source x-premium`。
+- 百炼的额度接口是控制台内部接口：部分账号即使配了 API key，仍会返回 `ConsoleNeedLogin`（需要控制台登录态），此时这个源读不到数字，只能等平台开放接口。
+- 默认的 `quota fetch` 会依次读取全部自动源，共享一个总预算；未配置的源会各自失败并让命令以部分成功（7）退出。只想看一两家时用 `--source`。
 - 不处理登录、验证码、2FA；不做后台定时抓取。
 - 只支持单账户；多账户不在当前范围。
+
+## 调研文档
+
+`docs/` 下的调研笔记（SaaS 化可行性、更多厂商接入路径、旧原型）是本地设计资料，**不随仓库发布**（已在 `.gitignore` 中忽略）。它们写于只有 3 个数据源、仍含火山引擎的时期，不代表当前实现；本 README 描述的行为才是唯一说明。
 
 ## 许可证
 
