@@ -247,6 +247,8 @@ The signature. Identity, track, stations, remainder.
 
 The same routes, compressed. Each source is a 28×2px square track, a 6px disc when a fraction exists, a short name, and a tabular remainder. Low Amber and Terminus Red recolor the number. The name, the healthy number, the 22px row, and the 6px control radius inherit the host composer.
 
+A source earns its line by carrying a number. One that was never read, and one whose read failed before it ever produced a figure — missing credentials, signed out, a parser that met a changed page — has nothing to draw: no fraction for the disc, and no remainder worth a row. It stays off the strip and out of the popover, which falls back to 「暂无数据」 when no source has a number. A source whose read failed but still holds last-good numbers keeps its line, with the failure in Terminus Red: the number is still the point.
+
 The popover repeats the diagram per source: a 2px route track, an 8px disc, and window labels placed by the same station rule. It does not draw the terminus diamond. Its radius, backdrop, and elevation are the host menu, not this platform.
 
 ## Do's and Don'ts
@@ -260,6 +262,7 @@ The popover repeats the diagram per source: a 2px route track, an 8px disc, and 
 - **Do** set digits in Quota Sans (Source Sans 3, 400 and 600, Latin) and Chinese in PingFang SC, then Noto Sans SC, then sans-serif, with tabular figures.
 - **Do** leave a missing window empty: no train, no diamond, and no zero in place of an unread amount.
 - **Do** keep the Harness strip on the same route colors and a 2px track, with a 6px disc in the strip and an 8px disc on the popover track.
+- **Do** leave a source without a number off the strip and out of the popover, whether it was never read or its read failed before producing one: there is no line to draw.
 
 ### Don't:
 

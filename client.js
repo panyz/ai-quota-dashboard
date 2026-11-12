@@ -526,6 +526,26 @@ window.__ModuleLoader__.load({
       return sources ? Object.keys(sources) : [];
     }
 
+    /**
+    * A source earns its line by carrying at least one numeric window. One that
+    * was never read, or whose read failed before it ever produced a number
+    * (missing credentials, not logged in), has nothing to print but a status,
+    * so it stays out of the strip and the popover. A source that failed but
+    * still holds last-good numbers keeps its line: the number is still true.
+    * @param {object|null|undefined} source
+    */
+    function hasReading(source) {
+      if (!source || !source.windows || typeof source.windows !== 'object') return false;
+      return Object.keys(source.windows).some((key) => {
+        const win = source.windows[key];
+        return win !== null && win !== undefined && typeof win.remaining === 'number' && Number.isFinite(win.remaining);
+      });
+    }
+
+    function visibleIds(sources) {
+      return sourceIds(sources).filter((id) => hasReading(sources[id]));
+    }
+
     function windowKeys(source) {
       if (source && Array.isArray(source.reportedWindows) && source.reportedWindows.length) return source.reportedWindows;
       return source && source.windows ? Object.keys(source.windows) : [];
@@ -842,6 +862,7 @@ window.__ModuleLoader__.load({
       const state = store.get();
       const view = state.view;
       const sources = view && view.sources ? view.sources : null;
+      const visible = sources ? visibleIds(sources) : [];
 
       React.useEffect(() => store.subscribe(() => setTick((n) => n + 1)), []);
 
@@ -940,8 +961,7 @@ window.__ModuleLoader__.load({
             h('span', { className: 'aqd-icon' }, gaugeIcon()),
             h('span', { className: 'aqd-title' }, tr('dock.label')),
             !state.loaded ? h('span', { className: 'aqd-muted' }, tr('dock.loading')) : null,
-            state.loaded && !sources ? h('span', { className: 'aqd-muted' }, tr('dock.never')) : null,
-            sources ? h('span', { className: 'aqd-chips' }, sourceIds(sources).map((id) => renderChip(id, sources[id]))) : null,
+            visible.length ? h('span', { className: 'aqd-chips' }, visible.map((id) => renderChip(id, sources[id]))) : null,
           ),
           h(
             'button',
@@ -1006,6 +1026,7 @@ window.__ModuleLoader__.load({
       const state = store.get();
       const view = state.view;
       const sources = view && view.sources ? view.sources : null;
+      const visible = sources ? visibleIds(sources) : [];
       const open = state.open === true;
 
       React.useEffect(() => store.subscribe(() => setTick((n) => n + 1)), []);
@@ -1098,8 +1119,8 @@ window.__ModuleLoader__.load({
           { className: 'aqd-pop-body' },
           state.error ? h('div', { className: 'aqd-error' }, errorText(state.error)) : null,
           !state.loaded ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.loading')) : null,
-          state.loaded && !sources ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.details.empty')) : null,
-          sources ? sourceIds(sources).map((id) => renderSource(id, sources[id])) : null,
+          state.loaded && !visible.length ? h('div', { className: 'aqd-muted aqd-pad' }, tr('dock.details.empty')) : null,
+          visible.map((id) => renderSource(id, sources[id])),
         ),
         h(
           'div',

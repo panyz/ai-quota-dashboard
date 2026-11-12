@@ -57,7 +57,7 @@ npm link        # 之后可直接用 quota
 本仓库同时是一个 DSH（DeepSeek Harness）Cordis bundle 插件，可直接在 Harness Web 界面里使用：
 
 - Host 半部（`index.js`）注册 `GET /ai-quota/state` 与 `POST /ai-quota/refresh`，复用 `src/` 里同一套 store / refresh / view 逻辑；
-- Client 半部（`client.js`）在输入框上方的 `conversation.composer.dock` 插槽里放一条紧凑额度条；点击后在额度条正上方浮出一层明细（每个来源的 5 小时 / 周 / 月、重置时间与刷新按钮），没有遮罩、不抢焦点。浮层挂在框架级 `shell.overlay` 插槽里、按额度条的实测位置用 fixed 坐标定位，因为输入框容器会裁剪自己的子元素。
+- Client 半部（`client.js`）在输入框上方的 `conversation.composer.dock` 插槽里放一条紧凑额度条；点击后在额度条正上方浮出一层明细（每个来源的 5 小时 / 周 / 月、重置时间与刷新按钮），没有遮罩、不抢焦点。额度条只列真的有数字的来源：一次都没读到、或读取失败且一个数字都没拿到（缺凭证、未登录、解析失败于首次读取）的来源不占位，明细里也不会列；读取失败但还留着上次数字的来源照常显示，状态与错误一并标出。全部来源都没数字时明细显示「暂无数据」。浮层挂在框架级 `shell.overlay` 插槽里、按额度条的实测位置用 fixed 坐标定位，因为输入框容器会裁剪自己的子元素。
 
 安装（在 Harness 里让 agent 执行，`target` 用本仓库绝对路径）：
 
