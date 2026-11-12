@@ -1,0 +1,76 @@
+name: 问题反馈
+description: 读取失败、解析出错、看板或插件显示不对
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请不要在 issue 里贴 API key、Cookie、页面 HTML 或带账号信息的截图；额度数字也请先改掉。
+        涉及凭证泄露风险的问题请按 [SECURITY.md](../../SECURITY.md) 走私密渠道，不要开公开 issue。
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 期望的结果，以及实际看到的结果
+      placeholder: 例如：quota fetch --source claude 退出码 4，但 ANTHROPIC_OAUTH_TOKEN 是刚生成的。
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: 出现在哪个界面
+      options:
+        - CLI（quota fetch / list / probe / doctor）
+        - 本地看板（quota serve）
+        - Harness 插件（输入框上方的 AI 额度条）
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: 涉及哪个来源
+      description: 不确定就选「不确定」；整条命令的问题选「全部」
+      options:
+        - OpenCode Go（opencode-go）
+        - X Premium · Grok（x-premium）
+        - Claude（claude）
+        - 智谱 GLM（zhipu）
+        - DeepSeek（deepseek）
+        - 阿里云百炼（alibaba）
+        - OpenAI Codex（codex）
+        - 全部 / 不确定
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. quota doctor
+        2. quota fetch --source claude --json
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: 输出与错误码
+      description: 贴 `quota list` / `quota probe --source <源> --json` 的结果，先删掉凭证和个人信息
+      render: shell
+  - type: textarea
+    id: doctor
+    attributes:
+      label: quota doctor 输出
+      render: shell
+      placeholder: |
+        ✓ dataDir    可写：…
+        ✓ schema     state.json 可读（schemaVersion 3）
+        ✗ cdp        连不上 127.0.0.1:9333 ……
+        ✓ serverPort 127.0.0.1:8787 可用
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      placeholder: macOS 15.2 / Node 22.20 / Chrome 157（只用接口类来源时写上这一点）
+    validations:
+      required: true

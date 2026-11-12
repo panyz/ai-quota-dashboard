@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用与排障
+    url: https://github.com/panyz/ai-quota-dashboard#排障
+    about: 先看 README 里的排障表、已知限制和退出码，八成的问题在那里有答案。
+  - name: 私下报告安全问题
+    url: https://github.com/panyz/ai-quota-dashboard/security/advisories/new
+    about: 涉及凭证、调试端口或隐私的问题，请走私密渠道，不要开公开 issue。

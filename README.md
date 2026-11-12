@@ -1,5 +1,10 @@
 # AI 额度看板（quota）
 
+[![test](https://github.com/panyz/ai-quota-dashboard/actions/workflows/test.yml/badge.svg)](https://github.com/panyz/ai-quota-dashboard/actions/workflows/test.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-141414)](LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A522-141414)](https://nodejs.org/)
+[![privacy](https://img.shields.io/badge/privacy-local--only-141414)](#数据与隐私)
+
 把多个 AI 订阅的额度聚到一个本机看板：读取你在浏览器里已登录的控制台页面，输出结构化 JSON 和本地网页。
 
 只读：不读取或导出浏览器的 Cookie、登录态；接口类来源只使用你自己配置的 key，凭证不会写进 `state.json`，也不会上传。
@@ -166,6 +171,13 @@ mock 只在显式设置环境变量时生效。`AQD_TEST_MOCK` 是兼容别名�
 - 默认的 `quota fetch` 会依次读取全部自动源，共享一个总预算；未配置的源会各自失败并让命令以部分成功（7）退出。只想看一两家时用 `--source`。
 - 不处理登录、验证码、2FA；不做后台定时抓取。
 - 只支持单账户；多账户不在当前范围。
+
+## 参与贡献
+
+- 想加一个数据源？一个 manifest + 一个纯函数解析器就够，数据模型、CLI、页面和插件都不用改，步骤见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- 只改解析器也可以：`test/fixtures/` 有真实页面文本，`npm test` 会直接跑它们。
+- 安全问题（凭证、调试端口、隐私）请按 [SECURITY.md](SECURITY.md) 私下报告，不要开公开 issue 贴凭证。
+- 变更历史见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可证
 
