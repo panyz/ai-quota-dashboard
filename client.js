@@ -291,7 +291,7 @@ window.__ModuleLoader__.load({
   padding: 2px 12px 4px;
 }
 .aqd-src { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 8px 4px; }
-.aqd-src-track { position: relative; height: 2px; margin: 14px 8px 18px; border-radius: 0; background: var(--route, #141414); }
+.aqd-src-track { position: relative; height: 2px; margin: 14px 8px 10px; border-radius: 0; background: var(--route, #141414); }
 .aqd-src-track > i { position: absolute; top: 50%; left: calc(var(--at, 0) * (100% - 8px)); width: 8px; height: 8px; border-radius: 50%; background: var(--route, currentColor); transform: translateY(-50%); }
 .aqd-src + .aqd-src { border-top: 1px solid var(--dsw-alias-border-l1); }
 .aqd-src-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -300,22 +300,33 @@ window.__ModuleLoader__.load({
 .aqd-src-status--ok { color: inherit; }
 .aqd-src-status--warn { color: #8a5a00; }
 .aqd-src-status--bad { color: #c23b22; }
-.aqd-wins { position: relative; height: 16px; margin: 0 8px; }
+.aqd-wins {
+  display: grid;
+  grid-template-columns: repeat(var(--wins, 1), minmax(0, 1fr));
+  gap: 2px 12px;
+  margin: 0 8px;
+}
 .aqd-win {
-  position: absolute;
-  left: calc(var(--at, 0) * 100%);
-  top: 0;
-  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   min-width: 0;
   font-size: 11px;
-  white-space: nowrap;
 }
-.aqd-win-k { color: inherit; }
+.aqd-win-k {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 13px;
+  color: var(--dsw-alias-label-secondary);
+}
 .aqd-win-v {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 15px;
   color: var(--dsw-alias-label-primary);
   font-variant-numeric: tabular-nums;
 }
@@ -505,7 +516,9 @@ window.__ModuleLoader__.load({
         return tr('empty.window');
       }
       const total = windowTotal(win);
-      if (total !== null) return fmtNumber(win.remaining) + ' / ' + fmtAmount(total, win.unit);
+      if (total !== null && win.unit !== '%') {
+        return fmtNumber(win.remaining) + ' / ' + fmtAmount(total, win.unit);
+      }
       return fmtAmount(win.remaining, win.unit);
     }
 
@@ -774,21 +787,26 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function renderWindow(key, win, source, at) {
+    function renderWindow(key, win, source) {
       const badge = windowBadge(win);
       const classes = ['aqd-win'];
       if (badge) classes.push('aqd-win--' + badge);
       if (!win) classes.push('aqd-win--empty');
+      const label = windowLabel(key, source);
+      const value = windowValue(win);
+      const reset = win && win.resetAt ? ' · ' + countdownText(win.resetAt) : '';
       return h(
         'span',
-        { key, className: classes.join(' '), style: { '--at': String(at) } },
-        h('span', { className: 'aqd-win-k' }, windowLabel(key, source) + ' ' + windowValue(win)),
+        { key, className: classes.join(' '), title: label + ' · ' + value + reset },
+        h('span', { className: 'aqd-win-k' }, label),
+        h('span', { className: 'aqd-win-v' }, value),
       );
     }
 
     function renderSource(id, source) {
       const status = source && typeof source.status === 'string' ? source.status : 'never';
       const at = usedAt(primaryWindow(source));
+      const keys = source ? windowKeys(source) : [];
       return h(
         'div',
         { key: id, className: 'aqd-src', style: { '--route': LINE[id] || '#141414' } },
@@ -802,13 +820,8 @@ window.__ModuleLoader__.load({
         source
           ? h(
               'div',
-              { className: 'aqd-wins' },
-              windowKeys(source).map((key, index, all) => {
-                const win = source.windows ? source.windows[key] : null;
-                const place = usedAt(win);
-                const at = place === null ? (all.length <= 1 ? 0 : index / (all.length - 1)) : place;
-                return renderWindow(key, win, source, at);
-              }),
+              { className: 'aqd-wins', style: { '--wins': String(keys.length || 1) } },
+              keys.map((key) => renderWindow(key, source.windows ? source.windows[key] : null, source)),
             )
           : null,
         source && source.error
